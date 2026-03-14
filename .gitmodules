@@ -1,0 +1,12 @@
+[submodule "subprojects/akiba_framework"]
+	path = subprojects/akiba_framework
+	url = https://github.com/IoTS-P/Akiba-Framework.git
+[submodule "subprojects/akiba_db_daemon"]
+	path = subprojects/akiba_db_daemon
+	url = https://github.com/IoTS-P/Akiba-DB-Daemon
+[submodule "subprojects/akiba_modules"]
+	path = subprojects/akiba_modules
+	url = https://github.com/IoTS-P/Akiba-Modules
+[submodule "subprojects/akiba_mod_utils"]
+	path = subprojects/akiba_mod_utils
+	url = https://github.com/IoTS-P/Akiba-Mod-Utils
