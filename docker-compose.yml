@@ -1,0 +1,18 @@
+services:
+  app:
+    image: akiba_allinone:${VERSION:-3.1.2}
+    build: .
+    entrypoint: ["/home/akiba/binaries/entrypoint.sh"]
+    command: ["./bin/akiba_db_daemon", "-c", "./resources/config.json"]
+    working_dir: /home/akiba/akiba_db_daemon
+    volumes:
+      - akiba_data:/home/akiba/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:31777/test", "||", "exit", "1"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  akiba_data:

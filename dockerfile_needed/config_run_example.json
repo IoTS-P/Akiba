@@ -1,0 +1,31 @@
+{
+  "username": "akiba",
+  "password": "akiba",
+  "usingInstance": "akiba-instance",
+  "general": {
+    "binariesRoot": "/home/akiba/binaries"
+  },
+  "withGhidraProject": {
+    "projectRoot": "/home/akiba/ghidra_projects",
+    "name": "example_project",
+    "mode": "new",
+    "saveProject": true,
+    "noCreateProgram": false
+  },
+  "sqlSource": {
+    "serverIP": "127.0.0.1",
+    "serverPort": 31777,
+    "useSnapshot": "current",
+    "constraint": "WHERE original_path LIKE '%import_example.elf'",
+    "disableUpdate": false
+  },
+  "tasks": [
+    {
+      "mainClassName": "org.iotsplab.akiba.module.AkibaExample",
+      "timeout": 600,
+      "consoleLogLevel": "debug",
+      "fileLogLevel": "debug",
+      "tableName": "example_table"
+    }
+  ]
+}

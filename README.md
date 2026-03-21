@@ -34,4 +34,5 @@ Ghidra.jar Version: 11.3.2 (Due to continuous updates of Ghidra API, other versi
 
 - Akiba Framework: Akiba runtime framework
 - Akiba Database Daemon: Akiba database daemon process
+- Akiba Mod Utils：Akiba utility module
 - Akiba Modules: Akiba modules (currently closed source)

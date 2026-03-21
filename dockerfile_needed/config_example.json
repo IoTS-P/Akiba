@@ -1,0 +1,16 @@
+{
+  "username": "akiba",
+  "password": "akiba",
+  "usingInstance": "akiba-instance",
+  "general": {
+    "binariesRoot": "/home/akiba/binaries",
+    "importRoot": "/home/akiba/binaries"
+  },
+  "withGhidraProject": {
+    "projectRoot": "/home/akiba/ghidra_projects",
+    "name": "example_project",
+    "mode": "new",
+    "saveProject": true,
+    "noCreateProgram": false
+  }
+}
