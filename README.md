@@ -9,8 +9,13 @@ Akiba is a Ghidra-based batch pipeline task supported binary analysis framework 
 😋 What are the advantages?
 
 - Supports multi-threaded pipeline analysis, suitable for running on compute servers
-- Currently uses PostgreSQL for data storage, supports using Akiba Database Daemon for remote database management
+- Currently uses PostgreSQL for data storage, uses Akiba Database Daemon for remote database management
 - Fully customizable and detachable modules, with support for simple workflow control
+- Supports massive Maven third-party library imports, more flexible and powerful than Ghidra Script
+
+🤗 Want to develop your own functional modules?
+
+Akiba provides an example module repository [Akiba-Mod-Example](https://github.com/IoTS-P/Akiba-Mod-Example), which contains example modules and development documentation. Welcome to Fork!
 
 😓 Any bugs?
 
@@ -30,9 +35,16 @@ Kotlin Version: 2.1.20 and above
 
 Ghidra.jar Version: 11.3.2 (Due to continuous updates of Ghidra API, other versions may have compatibility issues)
 
+## Docker deployment
+
+```shell
+docker-compose up --build
+```
+
 ## Submodules
 
 - Akiba Framework: Akiba runtime framework
 - Akiba Database Daemon: Akiba database daemon process
-- Akiba Mod Utils：Akiba utility module
+- Akiba Mod - Utils: Akiba utility module (re-encapsulation of Ghidra)
+- Akiba Mod - Example: Akiba example module
 - Akiba Modules: Akiba modules (currently closed source)
