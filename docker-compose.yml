@@ -1,5 +1,6 @@
 services:
   app:
+    container_name: akiba_all_in_one
     image: akiba_allinone:${VERSION:-3.1.2}
     build: .
     entrypoint: ["/home/akiba/binaries/entrypoint.sh"]
@@ -8,7 +9,7 @@ services:
     volumes:
       - akiba_data:/home/akiba/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:31777/test", "||", "exit", "1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:31777/test || exit 1"]
       interval: 30s
       timeout: 3s
       retries: 5

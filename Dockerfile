@@ -17,7 +17,7 @@ RUN useradd -m -s /bin/bash akiba && \
 USER akiba
 WORKDIR /home/akiba
 
-COPY subprojects/akiba_db_daemon/build/distributions/akiba_db_daemon-${VERSION}.zip .
+COPY --chown=akiba:akiba subprojects/akiba_db_daemon/build/distributions/akiba_db_daemon-${VERSION}.zip .
 #RUN wget https://github.com/IoTS-P/Akiba/releases/download/${VERSION}/akiba_db_daemon-${VERSION}.zip
 RUN unzip akiba_db_daemon-${VERSION}.zip && \
     rm akiba_db_daemon-${VERSION}.zip && \
@@ -27,7 +27,7 @@ RUN unzip akiba_db_daemon-${VERSION}.zip && \
     mkdir /akiba/instances
 
 WORKDIR /home/akiba
-COPY subprojects/akiba_framework/build/distributions/akiba_framework-${VERSION}.zip .
+COPY --chown=akiba:akiba subprojects/akiba_framework/build/distributions/akiba_framework-${VERSION}.zip .
 #RUN wget https://github.com/IoTS-P/Akiba/releases/download/${VERSION}/akiba_framework-${VERSION}.zip
 RUN unzip akiba_framework-${VERSION}.zip && \
     rm akiba_framework-${VERSION}.zip && \
@@ -35,6 +35,8 @@ RUN unzip akiba_framework-${VERSION}.zip && \
     cd akiba_framework
 
 RUN mkdir /home/akiba/binaries
-COPY dockerfile_needed /home/akiba/binaries
+COPY --chown=akiba:akiba dockerfile_needed /home/akiba/binaries
+RUN chmod +x /home/akiba/binaries/entrypoint.sh
+RUN chmod +x /home/akiba/binaries/test_run.sh
 
 WORKDIR /home/akiba/akiba_db_daemon

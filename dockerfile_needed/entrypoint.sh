@@ -7,7 +7,7 @@ FRAMEWORK_DIR="/home/akiba/akiba_framework"
 CONFIG="${DAEMON_DIR}/resources/config.json"
 PID_FILE="/tmp/akiba_db_daemon.pid"
 
-# 函数：等待 HTTP 服务就绪
+# Wait for db daemon ready
 wait_for_service() {
     local url=$1
     local max_attempts=30
@@ -28,7 +28,7 @@ wait_for_service() {
     return 1
 }
 
-# 函数：安全停止后台服务
+# Stop service safely
 cleanup() {
     if [ -f "$PID_FILE" ]; then
         local pid=$(cat "$PID_FILE")
@@ -68,7 +68,7 @@ if [ ! -f "$INIT_FLAG" ]; then
     echo ">>> Creating PostgreSQL instance for akiba..."
     cd "$FRAMEWORK_DIR"
     if ! ./bin/akiba_framework instance-create \
-        -n akiba-instance \
+        -i akiba-instance \
         -u akiba \
         -P akiba; then
         echo ">>> Initialization failed"

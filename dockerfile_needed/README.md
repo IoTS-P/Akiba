@@ -9,6 +9,6 @@ Use the commands below to run an example module on the imported elf file:
 
 ```shell
 cd /home/akiba/akiba_framework
-cp /home/akiba/binaries/amod-AkibaExample-1.0.jar /home/akiba/akiba_framework/modules/
+cp /home/akiba/binaries/amod-AkibaExample1-1.0.jar /home/akiba/akiba_framework/modules/
 ./bin/akiba_framework -c /home/akiba/binaries/config_run_example.json
 ```
