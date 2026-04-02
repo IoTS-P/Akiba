@@ -39,7 +39,7 @@ Ghidra.jar Version: 11.3.2 (Due to continuous updates of Ghidra API, other versi
 
 ```shell
 # sudo apt install docker-compose-v2
-DOCKER_BUILDKIT=1 docker compose up --build
+docker compose up --build
 ```
 
 ## Submodules
