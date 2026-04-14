@@ -9,6 +9,9 @@ project(":akiba_framework").projectDir = file("subprojects/akiba_framework")
 include("akiba_db_daemon")
 project(":akiba_db_daemon").projectDir = file("subprojects/akiba_db_daemon")
 
+include("akiba_mcp")
+project(":akiba_mcp").projectDir = file("subprojects/akiba_mcp")
+
 include("akiba_mod_utils")
 project(":akiba_mod_utils").projectDir = file("subprojects/akiba_mod_utils")
 

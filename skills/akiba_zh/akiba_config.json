@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "Akiba 简化配置 - 供智能体定位仓库和运行服务"
+  },
+  "akiba": {
+    "home": "/media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba",
+    "repoUrl": "https://github.com/IoTS-P/Akiba.git"
+  },
+  "modExample": {
+    "repoUrl": "https://github.com/IoTS-P/Akiba-Mod-Example.git"
+  },
+  "framework": {
+    "runCommand": "cd /media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba && ./gradlew :subprojects:akiba_framework:run"
+  },
+  "daemon": {
+    "host": "127.0.0.1",
+    "port": 31777
+  }
+}

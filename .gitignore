@@ -45,3 +45,5 @@ bin/
 /src/frontend
 /akiba-venv
 lib
+
+.opencode
