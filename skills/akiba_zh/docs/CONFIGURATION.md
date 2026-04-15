@@ -2,10 +2,10 @@
 
 ## 概述
 
-Akiba 使用 JSON 格式配置文件，通过 `-c` 参数指定。配置文件路径格式为 `<文件名>@<JSON路径>`，如 `config.json@main`。
+Akiba 使用 JSON 格式配置文件，通过 `-c` 参数指定。配置文件路径格式为 `<文件名>@<JSON路径>`，如 `config.json@/main`。
 
 **路径格式说明**：
-- `config.json@main` → `config.json` 中 JSON 路径 `/main`
+- `config.json@/main` → `config.json` 中 JSON 路径 `/main`（开头的 `/` 必须添加）
 - `@@/MyModule` → 主配置文件中 JSON 路径 `/MyModule`（简写形式）
 
 ## 主配置文件结构

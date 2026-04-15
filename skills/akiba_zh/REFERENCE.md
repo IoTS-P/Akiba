@@ -7,15 +7,13 @@ version: 1.0.0
 
 ## 概述
 
-本文档提供 Akiba 框架的快速参考信息，包括命令、路径和常用配置模板。适合作为日常使用的速查手册。
+本文档提供 Akiba 项目的快速参考信息，包括命令、路径和常用配置模板。适合作为日常使用的速查手册。
 
 ## 路径速查
 
 ### Akiba 项目根目录
 
-```
-/media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba
-```
+在 Docker 中默认不存在，需要从 Github https://github.com/IoTS-P/Akiba.git 克隆并拉取子模块并按照[快速启动 Checklist](#快速启动-checklist)中的[基于源代码仓库](#基于源代码仓库)的方式获取 ghidra.jar 并保存到正确位置。
 
 ### 核心子项目
 
@@ -45,21 +43,14 @@ version: 1.0.0
 
 ## 环境要求
 
-| 依赖 | 版本 | 说明 |
-|-----|------|------|
-| Java | 21+ | 必须设置 `JAVA_HOME` |
-| Kotlin | 2.1.20+ | |
-| Ghidra | 11.3.2 | 需要构建 ghidra.jar |
-| PostgreSQL | 最新稳定版 | 由 DB Daemon 管理 |
+| 依赖 | 版本 | 说明                               |
+|-----|------|----------------------------------|
+| Java | 21+ | 必须设置 `JAVA_HOME`                 |
+| Kotlin | 2.1.20+ |                                  |
+| Ghidra | 11.3.2 | 需要构建 ghidra.jar（构建方法见`SKILL.md`） |
+| PostgreSQL | 最新稳定版 | 由 DB Daemon 管理                   |
 
 ## 编译构建
-
-### 编译所有组件
-
-```bash
-cd /media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba
-./gradlew assemble
-```
 
 ### 编译特定组件
 
@@ -122,6 +113,8 @@ cd /media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba/subprojects/akiba_db_daem
 
 ### DB Daemon API
 
+下面仅有部分常用接口，更多接口请查看 [daemon 使用文档](https://IoTS-P/Akiba-DB-Daemon/Usage_guide_zh.md)。
+
 | 接口 | 方法 | 说明 |
 |-----|------|------|
 | `http://127.0.0.1:31777/test` | GET | 健康检查 |
@@ -135,22 +128,22 @@ cd /media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba/subprojects/akiba_db_daem
 
 ```bash
 # 创建实例
-./bin/Akiba instance-create -n <实例名> -u <用户名> -H 127.0.0.1 -p 31777
+./bin/akiba_framework instance-create -n <实例名> -u <用户名> -H 127.0.0.1 -p 31777
 
 # 启动实例
-./bin/Akiba instance-start -i <实例名> -u <用户名>
+./bin/akiba_framework instance-start -i <实例名> -u <用户名> -H 127.0.0.1 -p 31777
 
 # 关闭实例
-./bin/Akiba instance-shutdown -i <实例名> -u <用户名>
+./bin/akiba_framework instance-shutdown -i <实例名> -u <用户名> -H 127.0.0.1 -p 31777
 
 # 删除实例
-./bin/Akiba instance-delete -i <实例名> -u <用户名>
+./bin/akiba_framework instance-delete -i <实例名> -u <用户名> -H 127.0.0.1 -p 31777
 
 # 备份实例
-./bin/Akiba instance-backup -i <实例名> -t full -u <用户名>
+./bin/akiba_framework instance-backup -i <实例名> -t full -u <用户名> -H 127.0.0.1 -p 31777
 
 # 恢复实例
-./bin/Akiba instance-restore -n <新实例名> -l <备份标签> -u <用户名>
+./bin/akiba_framework instance-restore -n <新实例名> -l <备份标签> -u <用户名> -H 127.0.0.1 -p 31777
 ```
 
 ## 分析任务运行
@@ -158,30 +151,34 @@ cd /media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba/subprojects/akiba_db_daem
 ### 启动分析（正常模式）
 
 ```bash
-cd /media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba
-./gradlew run --args="-c config.json@main"
+# /home/akiba/akiba_framework 是 Akiba Docker 中 Akiba Framework 的固定路径
+cd /home/akiba/akiba_framework
+./bin/akiba_framework -c config.json@/main
 ```
 
 ### 导入文件模式
 
 ```bash
-./gradlew run --args="-i /path/to/import-example.json"
+cd /home/akiba/akiba_framework
+./bin/akiba_framework -i /path/to/import-example.json -c config.json@/main # 仍然需要指定 config.json 以确定数据库地址等配置
 ```
 
 ### 断点续传模式
 
 ```bash
+cd /home/akiba/akiba_framework
+
 # 继续最新任务
-./gradlew run --args="-r latest"
+./bin/akiba_framework -r latest
 
 # 继续指定时间戳的任务
-./gradlew run --args="-r 20250201140000"
+./bin/akiba_framework -r 20250201140000
 
 # 仅重试失败任务
-./gradlew run --args="-r latest -f"
+./bin/akiba_framework -r latest -f
 
-# 仅重试错误任务
-./gradlew run --args="-r latest -e"
+# 仅重试报错任务
+./bin/akiba_framework -r latest -e
 ```
 
 ## 配置模板
@@ -364,48 +361,102 @@ python3 subprojects/akiba_framework/src/main/scripts/starter.py &
 ### 手动续传
 
 ```bash
+cd /home/akiba/akiba_framework
+
 # 查看可用的断点
 ls log/
 
 # 续传指定任务
-./gradlew run --args="-r 20250201140000"
+./bin/akiba_framework -r 20250201140000
 ```
 
 ## 快速启动 checklist
 
+### 基于源代码仓库
+
 ```
 □ 1. 克隆仓库
+  cd ~
   git clone https://github.com/IoTS-P/Akiba.git
   cd Akiba
   git submodule update --init --recursive
 
-□ 2. 设置 Java 环境
+□ 2. 生成 ghidra.jar
+  wget https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_11.3.2_build/ghidra_11.3.2_PUBLIC_20250415.zip -O /tmp/ghidra.zip
+  unzip /tmp/ghidra.zip -d /tmp
+  cd /tmp/ghidra_11.3.2_PUBLIC/support
+  chmod +x ./buildGhidraJar
+  ./buildGhidraJar
+  cp ghidra.jar ~/Akiba/lib/ghidra.jar
+
+□ 3. 设置 Java 环境
+  cd ~/Akiba
   export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 
-□ 3. 编译
+□ 4. 编译
   ./gradlew assemble
 
-□ 4. 启动 DB Daemon
+□ 5. 启动 DB Daemon
   docker compose up -d
   # 或
   ./gradlew :subprojects:akiba_db_daemon:run
 
-□ 5. 创建数据库实例
+□ 6. 创建数据库实例
   ./gradlew run --args="instance-create -n akiba -u akiba"
 
-□ 6. 导入二进制文件
-  ./gradlew run --args="-i import-example.json"
+□ 7. 导入二进制文件
+  ./gradlew run --args="-i import-example.json -c config.json@/main"
 
-□ 7. 运行分析
-  ./gradlew run --args="-c config.json@main"
+□ 8. 运行分析
+  ./gradlew run --args="-c config.json@/main"
 ```
+
+### 基于 Docker（推荐）
+
+```
+□ 1. 克隆仓库
+  cd ~
+  git clone https://github.com/IoTS-P/Akiba.git
+  cd Akiba
+  
+□ 2. 构建 Docker 镜像并开启容器（需要软件包 docker-compose-v2）
+  docker compose up --build -d
+  
+□ 3. 进入 Docker 容器
+  docker exec -it akiba_all_in_one bash
+  
+□ 4. （可选）运行功能测试脚本
+  ~/binaries/test_run.sh
+  
+□ 5. 导入二进制文件
+  cd ~/akiba_framework 
+  ./bin/akiba_framework -i import-example.json -c config.json@/main
+  
+□ 6. 运行分析
+  cd ~/akiba_framework 
+  ./bin/akiba_framework -c config.json@/main
+```
+
+## Akiba Docker 关键目录解释
+
+| 目录                                  | 说明                                   |
+|-------------------------------------|--------------------------------------|
+| `/home/akiba/akiba_framework`       | Akiba 框架发布包根目录                       |
+| `/home/akiba/akiba_db_daemon`       | Akiba 数据库守护进程所在目录                    |
+| `/home/akiba/binaries`              | 示例模块、示例二进制文件、功能测试脚本所在目录              |
+| `/home/akiba/binaries/test_run.sh`  | 集成功能测试脚本，直接运行即可进行测试                  |
+| `/home/akiba/.akiba/daemon.log`     | 数据库守护进程（在容器中PID为1）日志                 |
+| `/home/akiba/.akiba/instances.json` | Akiba 管理的所有数据库实例信息（仅在数据库守护进程正常退出后更新） |
+| `/akiba/backups`                    | Akiba 管理的数据库实例的所有备份所在目录              |
+| `/akiba/instances`                  | Akiba 管理的所有数据库实例所在目录                 |
 
 ## 常见问题
 
-| 问题 | 解决方案 |
-|-----|---------|
-| DB Daemon 连接失败 | 检查 `127.0.0.1:31777` 是否可访问 |
-| 任务超时 | 增加 `timeout` 值或添加 `@IgnoreRuntimeTimeout` |
-| 数据库认证失败 | 确认 `username/password` 为 `akiba/akiba` |
-| 模块找不到 | 确认 JAR 文件在 `modules/` 目录且以 `amod` 开头 |
-| Ghidra 版本不兼容 | 使用 Ghidra 11.3.2 版本 |
+| 问题             | 解决方案                                      |
+|----------------|-------------------------------------------|
+| DB Daemon 连接失败 | 检查 `127.0.0.1:31777` 是否可访问                |
+| 任务超时           | 增加 `timeout` 值或添加 `@IgnoreRuntimeTimeout` |
+| 数据库认证失败        | 确认 `username/password` 为 `akiba/akiba`    |
+| 模块找不到          | 确认 JAR 文件在 `modules/` 目录且以 `amod` 开头      |
+| Ghidra 版本不兼容   | 使用 Ghidra 11.3.2 版本                       |
+| Akiba 框架运行时崩溃  | 使用断点续传参数恢复还未完成的任务                         |
