@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-git submodule update --init --recursive
+git submodule update --init subprojects/akiba_framework subprojects/akiba_mod_utils
 
 GHIDRA_VERSION="12.0.4"
 
@@ -23,7 +23,7 @@ fi
 ZIP_FILENAME=$(basename "$DOWNLOAD_URL")
 EXTRACT_DIR_NAME="${ZIP_FILENAME%.zip}"
 TMP_ZIP="/tmp/$ZIP_FILENAME"
-TMP_EXTRACT="/tmp/$EXTRACT_DIR_NAME"
+TMP_EXTRACT="/tmp/ghidra_${GHIDRA_VERSION}_PUBLIC"
 
 echo "[2/4] Downloading $ZIP_FILENAME to /tmp..."
 curl -fL "$DOWNLOAD_URL" -o "$TMP_ZIP"
@@ -32,11 +32,8 @@ echo "Extracting to /tmp..."
 unzip -q "$TMP_ZIP" -d /tmp
 
 echo "Building ghidra.jar..."
+cd subprojects/akiba_framework/lib
 "$TMP_EXTRACT/support/buildGhidraJar"
-
-echo "Moving ghidra.jar to $LIB_DIR..."
-mkdir -p "$LIB_DIR"
-mv "$TMP_EXTRACT/support/ghidra.jar" "$LIB_DIR/ghidra.jar"
 
 echo "[3/4] Cleaning up /tmp..."
 rm -f "$TMP_ZIP"
@@ -44,6 +41,7 @@ rm -rf "$TMP_EXTRACT"
 
 echo "[4/4] Building AkibaUtils module..."
 cd "$SCRIPT_DIR"
+chmod +x ./gradlew
 ./gradlew akiba_mod_utils:moduleJar-AkibaUtils
 
 AMOD_JAR=$(find subprojects/akiba_mod_utils/build/libs -name "amod-AkibaUtils-*.jar" | head -1)
