@@ -2,18 +2,22 @@ services:
   app:
     container_name: akiba_all_in_one
     image: akiba_allinone:${VERSION:-3.1.2}
+    network_mode: bridge  # Use existing virtual network
     build: .
     entrypoint: ["/home/akiba/binaries/entrypoint.sh"]
-    command: ["./bin/akiba_db_daemon", "-c", "./resources/config.json"]
-    working_dir: /home/akiba/akiba_db_daemon
+    ports:
+      - "80:80"
+      - "8080:8080"
+      - "31777:31777"
     volumes:
       - akiba_data:/home/akiba/data
+      - ./dockerfile_needed/.init:/home/akiba/.init
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:31777/test || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:80 && curl -f http://localhost:8080/api/health && curl -f http://localhost:31777/test"]
       interval: 30s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   akiba_data:

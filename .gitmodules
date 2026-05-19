@@ -13,3 +13,6 @@
 [submodule "subprojects/akiba_mod_example"]
 	path = subprojects/akiba_mod_example
 	url = https://github.com/IoTS-P/Akiba-Mod-Example
+[submodule "subprojects/akiba_frontend"]
+	path = subprojects/akiba_frontend
+	url = https://github.com/IoTS-P/Akiba-Frontend

@@ -28,9 +28,9 @@ sudo -u postgres psql -p 31800 -U akiba -c "SELECT pg_switch_wal(); SELECT pg_sw
 echo "Running test tasks 1..."
 mkdir -p modules
 cp ~/binaries/amod*.jar modules 2>/dev/null || echo "No module jars found, continuing..."
-./bin/akiba_framework -c ~/binaries/config_example.json -i ~/binaries/import_example.json
+./bin/akiba -c ~/binaries/config_example.json -i ~/binaries/import_example.json
 
-./bin/akiba_framework -c ~/binaries/config_run_example.json@/process_1
+./bin/akiba -c ~/binaries/config_run_example.json@/process_1
 
 echo ""
 echo "********************************************************************************"
@@ -57,7 +57,7 @@ echo ""
 
 # Perform first backup, which will only contains 2 tables, each has 1 row
 echo "Creating backup with first test data..."
-./bin/akiba_framework instance-backup -i akiba-instance -t full -u akiba -P akiba -a first_backup -d "First backup"
+./bin/akiba instance-backup -i akiba-instance -t full -u akiba -P akiba -a first_backup -d "First backup"
 BACKUP_DIR="/akiba/backups/akiba-instance"
 EMPTY_BACKUP_EXISTS=$(sudo -u postgres pgbackrest --stanza=akiba-instance --config="$BACKUP_DIR/pgbackrest.conf" info | grep -c 'full backup')
 if [ "$EMPTY_BACKUP_EXISTS" -lt 1 ]; then
@@ -75,7 +75,7 @@ echo ""
 # Run second test tasks
 echo "Running test tasks 2..."
 
-./bin/akiba_framework -c ~/binaries/config_run_example.json@/process_2
+./bin/akiba -c ~/binaries/config_run_example.json@/process_2
 
 echo ""
 echo "********************************************************************************"
@@ -98,7 +98,7 @@ echo ""
 
 # Create backup with test data
 echo "Creating backup with second test data..."
-./bin/akiba_framework instance-backup -i akiba-instance -t full -u akiba -P akiba -a second_backup -d "Second backup"
+./bin/akiba instance-backup -i akiba-instance -t full -u akiba -P akiba -a second_backup -d "Second backup"
 
 DATA_BACKUP_EXISTS=$(sudo -u postgres pgbackrest --stanza=akiba-instance --config="$BACKUP_DIR/pgbackrest.conf" info | grep -c 'full backup')
 if [ "$DATA_BACKUP_EXISTS" -lt 2 ]; then
@@ -115,8 +115,8 @@ echo ""
 
 # Restore akiba-instance to first backup state
 echo "Restoring akiba-instance to first backup state..."
-./bin/akiba_framework instance-restore -i akiba-instance -l first_backup -u akiba -P akiba
-./bin/akiba_framework instance-start -i akiba-instance -u akiba -P akiba
+./bin/akiba instance-restore -i akiba-instance -l first_backup -u akiba -P akiba
+./bin/akiba instance-start -i akiba-instance -u akiba -P akiba
 
 echo ""
 echo "********************************************************************************"
@@ -152,8 +152,8 @@ echo ""
 
 # Restore akiba-instance to second backup state
 echo "Restoring akiba-instance to second backup state..."
-./bin/akiba_framework instance-restore -i akiba-instance -l second_backup -u akiba -P akiba
-./bin/akiba_framework instance-start -i akiba-instance -u akiba -P akiba
+./bin/akiba instance-restore -i akiba-instance -l second_backup -u akiba -P akiba
+./bin/akiba instance-start -i akiba-instance -u akiba -P akiba
 
 echo ""
 echo "********************************************************************************"
