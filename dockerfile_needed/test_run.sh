@@ -22,12 +22,18 @@ echo ""
 
 cd /home/akiba/akiba_framework || exit 1
 
-sudo -u postgres psql -p 31800 -U akiba -c "SELECT pg_switch_wal(); SELECT pg_switch_wal();"
+sudo -u postgres psql -h 127.0.0.1 -p 31800 -U akiba -d akiba-instance -c "SELECT pg_switch_wal(); SELECT pg_switch_wal();"
 
 # Run first test tasks (import first)
 echo "Running test tasks 1..."
 mkdir -p modules
-cp ~/binaries/amod*.jar modules 2>/dev/null || echo "No module jars found, continuing..."
+# The Dockerfile already copies the gradle-built `amod-*.jar` files into modules/,
+# so we use `cp -n` (no-clobber) to avoid silently overwriting them with whatever
+# happens to live under ~/binaries/ — which is a stale snapshot that may have been
+# compiled against an older AkibaModule ABI and therefore would NoSuchMethodError
+# at construction time. The line is kept as a best-effort fallback for the case
+# where the modules directory is otherwise empty (custom builds, manual testing).
+cp -n ~/binaries/amod*.jar modules 2>/dev/null || echo "No module jars to add, continuing..."
 ./bin/akiba -c ~/binaries/config_example.json -i ~/binaries/import_example.json
 
 ./bin/akiba -c ~/binaries/config_run_example.json@/process_1
@@ -178,6 +184,131 @@ else
     echo "Expected counts: 1, 1, 1"
     exit 1
 fi
+
+echo ""
+echo "********************************************************************************"
+echo "************* Step 12: Test Runtime callModule() / importFile() ****************"
+echo "********************************************************************************"
+echo ""
+
+# This step exercises the runtime module-invocation API added to AkibaModule:
+#   - callModule(...) lets a running module invoke other modules on demand,
+#     without listing them in the static `tasks` array.
+#   - importFile(...) lets a running module register a new binary in the
+#     database at runtime and chain further analyses on it.
+#
+# The `process_3` config declares only AkibaExample4 as a task. AkibaExample4
+# internally:
+#   1) synthesizes a small variant of the binary under analysis,
+#   2) calls importFile() to register it (writing source_id/source_module),
+#   3) calls callModule("AkibaExample3", config = <in-memory>, targetId = newId),
+#   4) AkibaExample3 in turn calls callModule("AkibaExample1") to populate the
+#      strings table for the new binary and reads back its findMainFunction()
+#      task interface via callTaskAPI().
+#
+# Therefore, after process_3 succeeds we expect to see:
+#   - A second row in `binaries` whose `source_id` and `source_module` match
+#     the parent binary's id and "AkibaExample4" respectively.
+#   - A row in `example_table_4` containing the new id and a child failure
+#     sign of 0 (success).
+#   - A row in `example_table_3` for the new id, written by AkibaExample3.
+#   - A second row in `example_table_1` for the new id, populated by the
+#     chained AkibaExample1 invocation.
+
+echo "Running test tasks 3 (process_3 = AkibaExample4 with runtime dynamic dispatch)..."
+./bin/akiba -c ~/binaries/config_run_example.json@/process_3
+
+echo ""
+echo "Verifying database state after dynamic dispatch test..."
+
+# Total number of binary rows (parent + the variant imported at runtime).
+BINARIES_TOTAL=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM binaries;" 2>/dev/null | tr -d ' ')
+BINARIES_TOTAL=${BINARIES_TOTAL:--1}
+
+# Provenance: rows with source_module set must point at AkibaExample4 and reference
+# an existing parent via source_id.
+DERIVED_COUNT=$(psql -p 31800 --dbname=akiba-instance -t -c \
+    "SELECT COUNT(*) FROM binaries WHERE source_module = 'AkibaExample4' AND source_id IS NOT NULL;" \
+    2>/dev/null | tr -d ' ')
+DERIVED_COUNT=${DERIVED_COUNT:--1}
+
+# Result tables. example_table_3 / example_table_4 are created the first time
+# their owning module runs, so they should now exist with at least one row.
+EX3_COUNT=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM akiba_example3_results;" 2>/dev/null | tr -d ' ')
+EX3_COUNT=${EX3_COUNT:--1}
+EX4_COUNT=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM example_table_4;" 2>/dev/null | tr -d ' ')
+EX4_COUNT=${EX4_COUNT:--1}
+
+# AkibaExample4 records the spawned child's failureSign; SUCCESS == 0.
+CHILD_FAIL_SIGN=$(psql -p 31800 --dbname=akiba-instance -t -c \
+    "SELECT child_failure_sign FROM example_table_4 LIMIT 1;" \
+    2>/dev/null | tr -d ' ')
+CHILD_FAIL_SIGN=${CHILD_FAIL_SIGN:--1}
+
+# AkibaExample4 also captures, via the in-memory RuntimeReport mechanism, the
+# child module's matched_count (read out of the child's updateData mirror) and
+# its total execution time in ms. Both prove that the parent observed the
+# child's runtime side-effects without going through the database.
+CHILD_MATCHED=$(psql -p 31800 --dbname=akiba-instance -t -c \
+    "SELECT child_matched_count FROM example_table_4 LIMIT 1;" \
+    2>/dev/null | tr -d ' ')
+CHILD_MATCHED=${CHILD_MATCHED:--1}
+CHILD_EXEC_MS=$(psql -p 31800 --dbname=akiba-instance -t -c \
+    "SELECT child_execution_time_ms FROM example_table_4 LIMIT 1;" \
+    2>/dev/null | tr -d ' ')
+CHILD_EXEC_MS=${CHILD_EXEC_MS:--1}
+
+# AkibaExample1's table must now have grown to include the runtime-imported row,
+# proving callModule() correctly chained AkibaExample1 inside AkibaExample3.
+EX1_TOTAL=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM akiba_example1_results;" 2>/dev/null | tr -d ' ')
+EX1_TOTAL=${EX1_TOTAL:--1}
+
+echo "binaries total      = $BINARIES_TOTAL (expected >= 2)"
+echo "binaries derived    = $DERIVED_COUNT  (expected >= 1, source_module='AkibaExample4')"
+echo "example_table_3 cnt = $EX3_COUNT      (expected >= 1)"
+echo "example_table_4 cnt = $EX4_COUNT      (expected >= 1)"
+echo "child failure sign  = $CHILD_FAIL_SIGN (expected 0 == SUCCESS)"
+echo "child matched_count = $CHILD_MATCHED  (expected >= 0, read via RuntimeReport)"
+echo "child exec time ms  = $CHILD_EXEC_MS  (expected > 0, read via RuntimeReport)"
+echo "akiba_example1_results cnt = $EX1_TOTAL (expected >= 1: one for child)"
+
+if [ "$BINARIES_TOTAL" -lt 2 ]; then
+    echo "Error: importFile() did not create a new binaries row."
+    exit 1
+fi
+if [ "$DERIVED_COUNT" -lt 1 ]; then
+    echo "Error: source_id / source_module were not recorded by importFile()."
+    exit 1
+fi
+if [ "$EX4_COUNT" -lt 1 ]; then
+    echo "Error: AkibaExample4 did not write its result row."
+    exit 1
+fi
+# Validate the new RuntimeReport-driven columns. matched_count must be a
+# non-negative integer (0 is a perfectly legal "no strings matched"). exec_ms
+# must be strictly positive — the child surely took some non-zero wall time.
+if [ "$CHILD_MATCHED" -lt 0 ]; then
+    echo "Error: child_matched_count not propagated via RuntimeReport (got $CHILD_MATCHED)."
+    exit 1
+fi
+if [ "$CHILD_EXEC_MS" -le 0 ]; then
+    echo "Error: child_execution_time_ms not propagated via RuntimeReport (got $CHILD_EXEC_MS)."
+    exit 1
+fi
+if [ "$EX3_COUNT" -lt 1 ]; then
+    echo "Error: callModule(AkibaExample3, ...) was not executed by AkibaExample4."
+    exit 1
+fi
+if [ "$CHILD_FAIL_SIGN" != "0" ]; then
+    echo "Error: child module reported failure (sign=$CHILD_FAIL_SIGN)."
+    exit 1
+fi
+if [ "$EX1_TOTAL" -lt 2 ]; then
+    echo "Error: chained callModule(AkibaExample1) inside AkibaExample3 did not run."
+    exit 1
+fi
+
+echo "Runtime dynamic-dispatch test passed."
 
 echo ""
 echo "********************************************************************************"

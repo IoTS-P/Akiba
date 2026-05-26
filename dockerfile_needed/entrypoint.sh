@@ -146,6 +146,74 @@ else
     echo ">>> akiba_server database already initialized"
 fi
 
+# ========== Initialize backup database akiba_backup ==========
+
+DB_NAME=akiba_backup
+
+DB_EXISTS=$(sudo -u postgres psql -tAc \
+    "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}';")
+
+if [[ "$DB_EXISTS" != "1" ]]; then
+    echo "Database '${DB_NAME}' does not exist. Creating..."
+
+    sudo -u postgres psql <<EOF
+CREATE DATABASE ${DB_NAME}
+    OWNER akiba;
+EOF
+
+    echo "Database '${DB_NAME}' created with owner akiba."
+else
+    CURRENT_OWNER=$(sudo -u postgres psql -tAc \
+        "SELECT pg_catalog.pg_get_userbyid(datdba)
+         FROM pg_database
+         WHERE datname='${DB_NAME}';")
+
+    if [[ "$CURRENT_OWNER" != akiba ]]; then
+        echo "Database '${DB_NAME}' exists but owner is '${CURRENT_OWNER}', fixing..."
+
+        sudo -u postgres psql -c \
+            "ALTER DATABASE ${DB_NAME} OWNER TO akiba;"
+
+        echo "Database owner updated to akiba."
+    else
+        echo "Database '${DB_NAME}' already exists with correct owner."
+    fi
+fi
+
+sudo -u postgres psql <<EOF
+GRANT CONNECT, CREATE, TEMP ON DATABASE ${DB_NAME} TO akiba;
+
+\\c ${DB_NAME}
+
+ALTER SCHEMA public OWNER TO akiba;
+GRANT USAGE, CREATE ON SCHEMA public TO akiba;
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO akiba;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO akiba;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON TABLES TO akiba;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON SEQUENCES TO akiba;
+EOF
+
+DB_INIT_SQL="./resources/backup_db_init.sql"
+
+if [[ ! -f "$DB_INIT_SQL" ]]; then
+    echo "SQL file not found: $DB_INIT_SQL"
+    exit 1
+fi
+
+echo "Executing SQL file '$DB_INIT_SQL' on database '$DB_NAME'..."
+
+sudo -u postgres psql \
+    --dbname="$DB_NAME" \
+    --set=ON_ERROR_STOP=on \
+    --file="$DB_INIT_SQL"
+
+echo "SQL initialization completed successfully."
+
 # ========== First Time Initialization ==========
 if [ ! -f "$INIT_FLAG" ]; then
     echo ">>> First time startup, initializing..."
@@ -172,6 +240,14 @@ if [ ! -f "$INIT_FLAG" ]; then
         -u akiba \
         -P akiba; then
         echo ">>> Instance creation failed"
+        if [ -f /home/akiba/.akiba/daemon.log ]; then
+            echo ">>> Tail of daemon log (/home/akiba/.akiba/daemon.log):"
+            echo "----------------------------------------------------------------"
+            tail -n 200 /home/akiba/.akiba/daemon.log || true
+            echo "----------------------------------------------------------------"
+        else
+            echo ">>> Daemon log not found at /home/akiba/.akiba/daemon.log"
+        fi
         exit 1
     fi
 

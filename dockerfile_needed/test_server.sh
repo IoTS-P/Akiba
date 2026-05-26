@@ -72,7 +72,10 @@ echo ">>> Step 1.3: Run import and process test tasks..."
 cd "${AKIBA_FRAMEWORK_DIR}" || exit 1
 
 mkdir -p modules
-cp "${BINARIES_DIR}"/amod*.jar modules 2>/dev/null || log_warn "No module jars found, skipping..."
+# `cp -n` (no-clobber): the Dockerfile already populates modules/ from the freshly built
+# gradle outputs, so we must not overwrite those with potentially stale snapshots from
+# ${BINARIES_DIR}. See test_run.sh for the same rationale.
+cp -n "${BINARIES_DIR}"/amod*.jar modules 2>/dev/null || log_warn "No module jars to add, skipping..."
 
 if [ -f "${BINARIES_DIR}/config_example.json" ] && [ -f "${BINARIES_DIR}/import_example.json" ]; then
     log_info "Running import task..."

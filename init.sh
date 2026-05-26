@@ -3,7 +3,7 @@ set -euo pipefail
 
 git submodule update --init subprojects/akiba_framework subprojects/akiba_mod_utils
 
-GHIDRA_VERSION="12.0.4"
+GHIDRA_VERSION="12.1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/subprojects/akiba_framework/lib"

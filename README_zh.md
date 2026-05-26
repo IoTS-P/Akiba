@@ -29,9 +29,9 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 git submodule update --init --recursive
 ```
 
-Kotlin 版本：2.1.20 及以上
+Kotlin 版本：2.3.20 及以上
 
-Ghidra.jar 版本: 11.3.2 (因 Ghidra API 不断更新，其他版本可能会存在兼容性问题)
+Ghidra.jar 版本: 12.1 (因 Ghidra API 不断更新，其他版本可能会存在兼容性问题)
 
 ## Docker 容器部署
 
@@ -45,5 +45,6 @@ docker compose up --build
 - Akiba Framework：Akiba 运行时框架
 - Akiba Database Daemon：Akiba 数据库守护进程
 - Akiba Mod - Utils：Akiba 实用模块（对 Ghidra 进行二次封装）
-- Akiba Mod - Example: Akiba 示例模块
+- Akiba Mod - Example：Akiba 示例模块
+- Akiba Frontend：Akiba web 前端页面项目（alpha）
 - Akiba Modules：Akiba 模块（目前闭源）

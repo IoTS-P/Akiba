@@ -4,7 +4,7 @@
     "password": "akiba",
     "usingInstance": "akiba-instance",
     "general": {
-      "binariesRoot": "/home/akiba/binaries"
+      "binariesRoot": "/home/akiba/.akiba"
     },
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
@@ -35,7 +35,7 @@
     "password": "akiba",
     "usingInstance": "akiba-instance",
     "general": {
-      "binariesRoot": "/home/akiba/binaries"
+      "binariesRoot": "/home/akiba/.akiba"
     },
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
@@ -65,6 +65,38 @@
         "consoleLogLevel": "debug",
         "fileLogLevel": "debug",
         "tableName": "example_table_2"
+      }
+    ]
+  },
+  "process_3": {
+    "username": "akiba",
+    "password": "akiba",
+    "usingInstance": "akiba-instance",
+    "general": {
+      "binariesRoot": "/home/akiba/.akiba"
+    },
+    "withGhidraProject": {
+      "projectRoot": "/home/akiba/ghidra_projects",
+      "name": "example_project_3",
+      "mode": "new",
+      "saveProject": true,
+      "noCreateProgram": false
+    },
+    "sqlSource": {
+      "serverIP": "127.0.0.1",
+      "serverPort": 31777,
+      "useSnapshot": "current",
+      "constraint": "WHERE original_path LIKE '%import_example.elf'",
+      "disableUpdate": false
+    },
+    "tasks": [
+      {
+        "_comment": "Only AkibaExample4 is listed here on purpose: at runtime it will use the new callModule()/importFile() APIs to (a) import a derived binary, and (b) chain-invoke AkibaExample3 (which itself dynamically calls AkibaExample1) on that new id. If the dynamic dispatch works, example_table_3 and example_table_4 will both be populated even though only one task is declared.",
+        "mainClassName": "org.iotsplab.akiba.module.AkibaExample4",
+        "timeout": 600,
+        "consoleLogLevel": "debug",
+        "fileLogLevel": "debug",
+        "tableName": "example_table_4"
       }
     ]
   }
