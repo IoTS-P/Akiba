@@ -1,4 +1,4 @@
-# docker build -t akiba_allinone:3.1.2 .
+# docker build -t akiba_allinone:3.2.0 .
 
 FROM ubuntu:24.04
 ARG VERSION=3.2.0
