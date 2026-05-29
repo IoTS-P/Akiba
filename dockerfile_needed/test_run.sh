@@ -1,18 +1,82 @@
 #!/usr/bin/env bash
 
+# Track test result: 0 = success, non-zero = failure
+TEST_EXIT_CODE=0
+
+# ============================================================================
+# Cleanup function — always runs regardless of test success/failure
+# ============================================================================
+cleanup() {
+    echo ""
+    echo "********************************************************************************"
+    echo "******************************* Cleanup: Test Data *****************************"
+    echo "********************************************************************************"
+    echo ""
+
+    echo "Cleaning up test data from database..."
+
+    # Drop module result tables created during testing
+    psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_1 CASCADE;" 2>/dev/null
+    psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_2 CASCADE;" 2>/dev/null
+    psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS akiba_example3_results CASCADE;" 2>/dev/null
+    psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_4 CASCADE;" 2>/dev/null
+    psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS akiba_example1_results CASCADE;" 2>/dev/null
+
+    # Remove binary records and reset auto-increment sequence
+    psql -p 31800 --dbname=akiba-instance -c "DELETE FROM binaries;" 2>/dev/null
+    psql -p 31800 --dbname=akiba-instance -c "ALTER SEQUENCE binaries_id_seq RESTART WITH 1;" 2>/dev/null
+
+    # Remove logs so subsequent replay tests are not skipped due to duplicate detection
+    rm -rf ~/.akiba/logs/*
+
+    echo "Test data cleaned up."
+
+    echo ""
+    if [ "$TEST_EXIT_CODE" -eq 0 ]; then
+        echo "********************************************************************************"
+        echo "**************************** Test Completed Successfully ***********************"
+        echo "********************************************************************************"
+    else
+        echo "********************************************************************************"
+        echo "**************************** Test FAILED (exit code: $TEST_EXIT_CODE) **********"
+        echo "********************************************************************************"
+    fi
+    echo ""
+
+    exit "$TEST_EXIT_CODE"
+}
+
+# Register cleanup to run on EXIT (covers normal exit, errors, signals)
+trap cleanup EXIT
+
+# ============================================================================
+# Helper: fail with message, set exit code, then let trap handle cleanup
+# ============================================================================
+fail() {
+    echo "FAIL: $1"
+    TEST_EXIT_CODE=1
+    exit 1
+}
+
+# ============================================================================
+# Step 1: Check Database Daemon
+# ============================================================================
+
 echo ""
 echo "********************************************************************************"
 echo "******************************* Step 1: Check Database Daemon ******************"
 echo "********************************************************************************"
 echo ""
 
-# Step 1: Check if the database daemon is running and accessible
 echo "Checking if database daemon is running..."
 if ! curl -f http://localhost:31777/test; then
-    echo "Error: Database daemon is not running or not accessible!"
-    exit 1
+    fail "Database daemon is not running or not accessible!"
 fi
 echo "Database daemon is running normally."
+
+# ============================================================================
+# Step 2: Run First Test Tasks
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -20,23 +84,20 @@ echo "******************************* Step 2: Run First Test Tasks *************
 echo "********************************************************************************"
 echo ""
 
-cd /home/akiba/akiba_framework || exit 1
+cd /home/akiba/akiba_framework || fail "Cannot cd to akiba_framework"
 
 sudo -u postgres psql -h 127.0.0.1 -p 31800 -U akiba -d akiba-instance -c "SELECT pg_switch_wal(); SELECT pg_switch_wal();"
 
-# Run first test tasks (import first)
 echo "Running test tasks 1..."
 mkdir -p modules
-# The Dockerfile already copies the gradle-built `amod-*.jar` files into modules/,
-# so we use `cp -n` (no-clobber) to avoid silently overwriting them with whatever
-# happens to live under ~/binaries/ — which is a stale snapshot that may have been
-# compiled against an older AkibaModule ABI and therefore would NoSuchMethodError
-# at construction time. The line is kept as a best-effort fallback for the case
-# where the modules directory is otherwise empty (custom builds, manual testing).
 cp -n ~/binaries/amod*.jar modules 2>/dev/null || echo "No module jars to add, continuing..."
 ./bin/akiba -c ~/binaries/config_example.json -i ~/binaries/import_example.json
 
 ./bin/akiba -c ~/binaries/config_run_example.json@/process_1
+
+# ============================================================================
+# Step 3: Verify Database Data
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -44,16 +105,17 @@ echo "******************************* Step 3: Verify Database Data *************
 echo "********************************************************************************"
 echo ""
 
-# Verify that the database has data after running test tasks
 echo "Verifying database has data after test tasks 1..."
 if ! psql -p 31800 --dbname=akiba-instance -c "SELECT * FROM binaries;" 2>/dev/null | grep '(1 row)'; then
-    echo "No binaries table or empty, first run failed?"
-    exit 1
+    fail "No binaries table or empty, first run failed?"
 fi
 if ! psql -p 31800 --dbname=akiba-instance -c "SELECT * FROM example_table_1;" 2>/dev/null | grep '(1 row)'; then
-    echo "No example_table_1 or empty, first run failed?"
-    exit 1
+    fail "No example_table_1 or empty, first run failed?"
 fi
+
+# ============================================================================
+# Step 4: Create First Backup
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -61,16 +123,18 @@ echo "******************************* Step 4: Create First Backup **************
 echo "********************************************************************************"
 echo ""
 
-# Perform first backup, which will only contains 2 tables, each has 1 row
 echo "Creating backup with first test data..."
 ./bin/akiba instance-backup -i akiba-instance -t full -u akiba -P akiba -a first_backup -d "First backup"
 BACKUP_DIR="/akiba/backups/akiba-instance"
 EMPTY_BACKUP_EXISTS=$(sudo -u postgres pgbackrest --stanza=akiba-instance --config="$BACKUP_DIR/pgbackrest.conf" info | grep -c 'full backup')
 if [ "$EMPTY_BACKUP_EXISTS" -lt 1 ]; then
-    echo "Error: First backup was not created normally!"
-    exit 1
+    fail "First backup was not created normally!"
 fi
 echo "First backup created successfully."
+
+# ============================================================================
+# Step 5: Run Second Test Tasks
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -78,10 +142,12 @@ echo "******************************* Step 5: Run Second Test Tasks ************
 echo "********************************************************************************"
 echo ""
 
-# Run second test tasks
 echo "Running test tasks 2..."
-
 ./bin/akiba -c ~/binaries/config_run_example.json@/process_2
+
+# ============================================================================
+# Step 6: Verify Database Data Again
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -89,12 +155,14 @@ echo "******************************* Step 6: Verify Database Data Again *******
 echo "********************************************************************************"
 echo ""
 
-# Verify that the database has right data after running test tasks
 echo "Verifying database has data after test tasks 2..."
 if ! psql -p 31800 --dbname=akiba-instance -c "SELECT * FROM example_table_2;" 2>/dev/null | grep '(1 row)'; then
-    echo "No example_table_2 or empty, second run failed?"
-    exit 1
+    fail "No example_table_2 or empty, second run failed?"
 fi
+
+# ============================================================================
+# Step 7: Create Second Backup
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -102,16 +170,18 @@ echo "******************************* Step 7: Create Second Backup *************
 echo "********************************************************************************"
 echo ""
 
-# Create backup with test data
 echo "Creating backup with second test data..."
 ./bin/akiba instance-backup -i akiba-instance -t full -u akiba -P akiba -a second_backup -d "Second backup"
 
 DATA_BACKUP_EXISTS=$(sudo -u postgres pgbackrest --stanza=akiba-instance --config="$BACKUP_DIR/pgbackrest.conf" info | grep -c 'full backup')
 if [ "$DATA_BACKUP_EXISTS" -lt 2 ]; then
-    echo "Error: Second backup was not created successfully!"
-    exit 1
+    fail "Second backup was not created successfully!"
 fi
 echo "Second backup created successfully."
+
+# ============================================================================
+# Step 8: Restore to First Backup
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -119,10 +189,13 @@ echo "******************************* Step 8: Restore to First Backup **********
 echo "********************************************************************************"
 echo ""
 
-# Restore akiba-instance to first backup state
 echo "Restoring akiba-instance to first backup state..."
 ./bin/akiba instance-restore -i akiba-instance -l first_backup -u akiba -P akiba
 ./bin/akiba instance-start -i akiba-instance -u akiba -P akiba
+
+# ============================================================================
+# Step 9: Verify Restored State
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -130,7 +203,6 @@ echo "******************************* Step 9: Verify Restored State ************
 echo "********************************************************************************"
 echo ""
 
-# Verify if the database is as expected
 echo "Verifying database is as expected after restoring to first backup..."
 BINARIES_COUNT=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM binaries;" 2>/dev/null | tr -d ' ')
 EXAMPLE_1_COUNT=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM example_table_1;" 2>/dev/null | tr -d ' ')
@@ -140,15 +212,18 @@ BINARIES_COUNT=${BINARIES_COUNT:--1}
 EXAMPLE_1_COUNT=${EXAMPLE_1_COUNT:--1}
 EXAMPLE_2_COUNT=${EXAMPLE_2_COUNT:--1}
 
-# When we return to the first backup, the table example_table_2 should not exist, and the table binaries and example_table_1 should has 1 row. 
-# So we check if binaries count is 1, example_table_1 count is 1, and example_table_2 count is 0 or table not exist (which will also return count as 0).
+# When we return to the first backup, the table example_table_2 should not exist, and the table binaries and example_table_1 should has 1 row.
 if [ "$BINARIES_COUNT" -eq 1 ] && [ "$EXAMPLE_1_COUNT" -eq 1 ] && [ "$EXAMPLE_2_COUNT" -eq -1 ]; then
     echo "Database is as expected after restoring to first backup."
 else
     echo "Warning: Database may not be completely expected. Row count: $BINARIES_COUNT, $EXAMPLE_1_COUNT, $EXAMPLE_2_COUNT (-1 means table does not exist)"
     echo "Expected counts: 1, 1, -1"
-    exit 1
+    fail "Restore to first backup verification failed"
 fi
+
+# ============================================================================
+# Step 10: Restore to Second Backup
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -156,10 +231,13 @@ echo "****************************** Step 10: Restore to Second Backup *********
 echo "********************************************************************************"
 echo ""
 
-# Restore akiba-instance to second backup state
 echo "Restoring akiba-instance to second backup state..."
 ./bin/akiba instance-restore -i akiba-instance -l second_backup -u akiba -P akiba
 ./bin/akiba instance-start -i akiba-instance -u akiba -P akiba
+
+# ============================================================================
+# Step 11: Verify Final State
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -167,7 +245,6 @@ echo "****************************** Step 11: Verify Final State ***************
 echo "********************************************************************************"
 echo ""
 
-# Verify if the database has data after restoring to test data backup
 echo "Verifying database has data after restoring to test data backup..."
 BINARIES_COUNT_AFTER=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM binaries;" 2>/dev/null | tr -d ' ')
 EXAMPLE_1_COUNT_AFTER=$(psql -p 31800 --dbname=akiba-instance -t -c "SELECT COUNT(*) FROM example_table_1;" 2>/dev/null | tr -d ' ')
@@ -182,8 +259,12 @@ if [ "$BINARIES_COUNT_AFTER" -eq 1 ] || [ "$EXAMPLE_1_COUNT_AFTER" -eq 1 ] || [ 
 else
     echo "Warning: Database appears to be unexpected after restoring to second backup. Row count: $BINARIES_COUNT_AFTER, $EXAMPLE_1_COUNT_AFTER, $EXAMPLE_2_COUNT_AFTER (-1 means table does not exist)"
     echo "Expected counts: 1, 1, 1"
-    exit 1
+    fail "Restore to second backup verification failed"
 fi
+
+# ============================================================================
+# Step 12: Test Runtime callModule() / importFile()
+# ============================================================================
 
 echo ""
 echo "********************************************************************************"
@@ -273,66 +354,30 @@ echo "child exec time ms  = $CHILD_EXEC_MS  (expected > 0, read via RuntimeRepor
 echo "akiba_example1_results cnt = $EX1_TOTAL (expected >= 1: one for child)"
 
 if [ "$BINARIES_TOTAL" -lt 2 ]; then
-    echo "Error: importFile() did not create a new binaries row."
-    exit 1
+    fail "importFile() did not create a new binaries row."
 fi
 if [ "$DERIVED_COUNT" -lt 1 ]; then
-    echo "Error: source_id / source_module were not recorded by importFile()."
-    exit 1
+    fail "source_id / source_module were not recorded by importFile()."
 fi
 if [ "$EX4_COUNT" -lt 1 ]; then
-    echo "Error: AkibaExample4 did not write its result row."
-    exit 1
+    fail "AkibaExample4 did not write its result row."
 fi
-# Validate the new RuntimeReport-driven columns. matched_count must be a
-# non-negative integer (0 is a perfectly legal "no strings matched"). exec_ms
-# must be strictly positive — the child surely took some non-zero wall time.
 if [ "$CHILD_MATCHED" -lt 0 ]; then
-    echo "Error: child_matched_count not propagated via RuntimeReport (got $CHILD_MATCHED)."
-    exit 1
+    fail "child_matched_count not propagated via RuntimeReport (got $CHILD_MATCHED)."
 fi
 if [ "$CHILD_EXEC_MS" -le 0 ]; then
-    echo "Error: child_execution_time_ms not propagated via RuntimeReport (got $CHILD_EXEC_MS)."
-    exit 1
+    fail "child_execution_time_ms not propagated via RuntimeReport (got $CHILD_EXEC_MS)."
 fi
 if [ "$EX3_COUNT" -lt 1 ]; then
-    echo "Error: callModule(AkibaExample3, ...) was not executed by AkibaExample4."
-    exit 1
+    fail "callModule(AkibaExample3, ...) was not executed by AkibaExample4."
 fi
 if [ "$CHILD_FAIL_SIGN" != "0" ]; then
-    echo "Error: child module reported failure (sign=$CHILD_FAIL_SIGN)."
-    exit 1
+    fail "child module reported failure (sign=$CHILD_FAIL_SIGN)."
 fi
 if [ "$EX1_TOTAL" -lt 1 ]; then
-    echo "Error: chained callModule(AkibaExample1) inside AkibaExample3 did not run."
-    exit 1
+    fail "chained callModule(AkibaExample1) inside AkibaExample3 did not run."
 fi
 
 echo "Runtime dynamic-dispatch test passed."
 
-echo ""
-echo "********************************************************************************"
-echo "******************************* Cleanup: Test Data *****************************"
-echo "********************************************************************************"
-echo ""
-
-# Remove all test data generated during this run so the database is left clean.
-echo "Cleaning up test data from database..."
-
-# Drop module result tables created during testing
-psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_1 CASCADE;" 2>/dev/null
-psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_2 CASCADE;" 2>/dev/null
-psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS akiba_example3_results CASCADE;" 2>/dev/null
-psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_4 CASCADE;" 2>/dev/null
-psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS akiba_example1_results CASCADE;" 2>/dev/null
-
-# Remove binary records inserted during import/runtime
-psql -p 31800 --dbname=akiba-instance -c "DELETE FROM binaries;" 2>/dev/null
-
-echo "Test data cleaned up."
-
-echo ""
-echo "********************************************************************************"
-echo "**************************** Test Completed Successfully ***********************"
-echo "********************************************************************************"
-echo ""
+# If we reach here, all tests passed. cleanup() will be triggered by trap EXIT.
