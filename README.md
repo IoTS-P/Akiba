@@ -50,3 +50,4 @@ docker compose up --build
 - Akiba Mod - Example: Akiba example module
 - Akiba Frontend: Akiba webpage (alpha)
 - Akiba Modules: Akiba modules (currently closed source)
+  
