@@ -99,5 +99,43 @@
         "tableName": "example_table_4"
       }
     ]
+  },
+  "process_4": {
+    "username": "akiba",
+    "password": "akiba",
+    "usingInstance": "akiba-instance",
+    "general": {
+      "binariesRoot": "/home/akiba/.akiba"
+    },
+    "withGhidraProject": {
+      "projectRoot": "/home/akiba/ghidra_projects",
+      "name": "example_project_4",
+      "mode": "new",
+      "saveProject": true,
+      "noCreateProgram": false
+    },
+    "sqlSource": {
+      "serverIP": "127.0.0.1",
+      "serverPort": 31777,
+      "useSnapshot": "current",
+      "constraint": "WHERE original_path LIKE '%import_example.elf'",
+      "disableUpdate": false
+    },
+    "llm": {
+      "provider": "YOUR_PROVIDER",
+      "modelName": "YOUR_MODEL",
+      "apiKeyEnv": "AKIBA_LLM_API_KEY",
+      "apiKey": "",
+      "baseUrl": ""
+    },
+    "tasks": [
+      {
+        "_comment": "AkibaExample5 is an AgentModule that runs an LLM agent to analyze the binary for security vulnerabilities. It requires an 'llm' section in the config. The test is skipped if no API key is available.",
+        "mainClassName": "org.iotsplab.akiba.module.AkibaExample5",
+        "timeout": 300,
+        "consoleLogLevel": "debug",
+        "fileLogLevel": "debug"
+      }
+    ]
   }
 }

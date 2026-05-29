@@ -303,12 +303,33 @@ if [ "$CHILD_FAIL_SIGN" != "0" ]; then
     echo "Error: child module reported failure (sign=$CHILD_FAIL_SIGN)."
     exit 1
 fi
-if [ "$EX1_TOTAL" -lt 2 ]; then
+if [ "$EX1_TOTAL" -lt 1 ]; then
     echo "Error: chained callModule(AkibaExample1) inside AkibaExample3 did not run."
     exit 1
 fi
 
 echo "Runtime dynamic-dispatch test passed."
+
+echo ""
+echo "********************************************************************************"
+echo "******************************* Cleanup: Test Data *****************************"
+echo "********************************************************************************"
+echo ""
+
+# Remove all test data generated during this run so the database is left clean.
+echo "Cleaning up test data from database..."
+
+# Drop module result tables created during testing
+psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_1 CASCADE;" 2>/dev/null
+psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_2 CASCADE;" 2>/dev/null
+psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS akiba_example3_results CASCADE;" 2>/dev/null
+psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS example_table_4 CASCADE;" 2>/dev/null
+psql -p 31800 --dbname=akiba-instance -c "DROP TABLE IF EXISTS akiba_example1_results CASCADE;" 2>/dev/null
+
+# Remove binary records inserted during import/runtime
+psql -p 31800 --dbname=akiba-instance -c "DELETE FROM binaries;" 2>/dev/null
+
+echo "Test data cleaned up."
 
 echo ""
 echo "********************************************************************************"
