@@ -4,7 +4,7 @@
 
 🤔 What is Akiba?
 
-Akiba is a Ghidra-based batch pipeline task supported binary analysis framework that provides high flexibility for binary file analysis. It is developed based on Ghidra and Kotlin language, making it very suitable for scenarios that require large-scale batch analysis.
+Akiba is a Ghidra-based batch pipeline task supported binary analysis framework that provides high flexibility for binary file analysis. It is developed based on Ghidra and Kotlin language, making it very suitable for scenarios that require large-scale batch analysis. Akiba has implemented an LLM agent base infrastructure and has improved its ability on single-file analysis.
 
 😋 What are the advantages?
 
@@ -12,6 +12,7 @@ Akiba is a Ghidra-based batch pipeline task supported binary analysis framework 
 - Currently uses PostgreSQL for data storage, uses Akiba Database Daemon for remote database management
 - Fully customizable and detachable modules, with support for simple workflow control
 - Supports massive Maven third-party library imports, more flexible and powerful than Ghidra Script
+- Completed LLM agent base infrastructure development, now you can use LLM API to analyze your binaries
 
 🤗 Want to develop your own functional modules?
 
