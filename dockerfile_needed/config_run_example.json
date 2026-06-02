@@ -22,6 +22,9 @@
     },
     "tasks": [
       {
+        "mainClassName": "org.iotsplab.akiba.module.AkibaUtils"
+      },
+      {
         "mainClassName": "org.iotsplab.akiba.module.AkibaExample1",
         "timeout": 600,
         "consoleLogLevel": "debug",
@@ -129,6 +132,9 @@
       "baseUrl": ""
     },
     "tasks": [
+      {
+        "mainClassName": "org.iotsplab.akiba.module.AkibaUtils"
+      },
       {
         "_comment": "AkibaExample5 is an AgentModule that runs an LLM agent to analyze the binary for security vulnerabilities. It requires an 'llm' section in the config. The test is skipped if no API key is available.",
         "mainClassName": "org.iotsplab.akiba.module.AkibaExample5",
