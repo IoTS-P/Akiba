@@ -2,7 +2,7 @@ services:
   app:
     container_name: akiba_all_in_one
     platform: linux/amd64
-    image: akiba_allinone:${VERSION:-3.2.0}
+    image: akiba_allinone:${VERSION:-4.0.0}
     network_mode: bridge  # Use existing virtual network
     build: .
     entrypoint: ["/home/akiba/binaries/entrypoint.sh"]
