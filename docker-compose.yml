@@ -12,7 +12,6 @@ services:
       - "31777:31777"
     volumes:
       - akiba_data:/home/akiba/data
-      - ./dockerfile_needed/.init:/home/akiba/.init
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:80 && curl -f http://localhost:8080/api/health && curl -f http://localhost:31777/test"]
       interval: 30s

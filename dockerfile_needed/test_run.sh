@@ -4,9 +4,66 @@
 TEST_EXIT_CODE=0
 
 # ============================================================================
+# CLI / env options
+# ============================================================================
+#
+#   -k, --keep-on-success   Skip cleanup if all tests pass, leaving the
+#                           database tables, log dirs, binary cache and
+#                           Ghidra projects in place for post-mortem
+#                           debugging. A failing run always cleans up,
+#                           regardless of this flag, to avoid leaving
+#                           bad state behind.
+#
+# Equivalent env-var: KEEP_ON_SUCCESS=1
+# ============================================================================
+KEEP_ON_SUCCESS="${KEEP_ON_SUCCESS:-0}"
+for arg in "$@"; do
+    case "$arg" in
+        -k|--keep-on-success) KEEP_ON_SUCCESS=1 ;;
+        -h|--help)
+            cat <<EOF
+Usage: $(basename "$0") [options]
+
+Options:
+  -k, --keep-on-success   Do not run cleanup if the test succeeds.
+                          Useful for post-mortem inspection of the
+                          database / Ghidra project / log files.
+                          A failing run always cleans up.
+  -h, --help              Show this help and exit.
+
+Environment:
+  KEEP_ON_SUCCESS=1       Same as --keep-on-success.
+EOF
+            exit 0
+            ;;
+        *) echo "Unknown option: $arg" >&2; exit 2 ;;
+    esac
+done
+
+# ============================================================================
 # Cleanup function — always runs regardless of test success/failure
 # ============================================================================
 cleanup() {
+    if [ "$TEST_EXIT_CODE" -eq 0 ] && [ "$KEEP_ON_SUCCESS" = "1" ]; then
+        echo ""
+        echo "********************************************************************************"
+        echo "**************** Skipping cleanup (--keep-on-success) **************************"
+        echo "********************************************************************************"
+        echo ""
+        echo "Test artifacts preserved for debugging:"
+        echo "  - DB tables:      example_table_*, akiba_example*_results, binaries"
+        echo "  - Logs:           ~/.akiba/logs/  (excluding 'server')"
+        echo "  - Binary cache:   ~/.akiba/original/, ~/.akiba/processed/"
+        echo "  - Workspace:      ~/.akiba/workspace/"
+        echo "  - Ghidra project: ~/ghidra_projects/"
+        echo ""
+        echo "********************************************************************************"
+        echo "**************************** Test Completed Successfully ***********************"
+        echo "********************************************************************************"
+        echo ""
+        exit 0
+    fi
+
     echo ""
     echo "********************************************************************************"
     echo "******************************* Cleanup: Test Data *****************************"
@@ -26,8 +83,43 @@ cleanup() {
     psql -p 31800 --dbname=akiba-instance -c "DELETE FROM binaries;" 2>/dev/null
     psql -p 31800 --dbname=akiba-instance -c "ALTER SEQUENCE binaries_id_seq RESTART WITH 1;" 2>/dev/null
 
-    # Remove logs so subsequent replay tests are not skipped due to duplicate detection
-    rm -rf ~/.akiba/logs/*
+    # ------------------------------------------------------------------
+    # File-system cleanup
+    #
+    # Several persistent on-disk artifacts must be removed for replay
+    # tests to behave like a fresh first run; otherwise the second run
+    # will hit "duplicate file" / "already exists" errors:
+    #
+    #   1. ~/.akiba/logs/*    — per-run log directories. We keep the
+    #                           `server` subdir (it belongs to the long
+    #                           running akiba_server process and is not
+    #                           test data).
+    #   2. ~/.akiba/original/, ~/.akiba/processed/
+    #                         — copies of imported binaries renamed by
+    #                           id; stale entries collide with new ids
+    #                           after the binaries table is reset.
+    #   3. ~/.akiba/workspace/* — per-module workspace files.
+    #   4. ~/ghidra_projects/* — Ghidra project files (*.gpr + *.rep/).
+    #                           These remember every previously-imported
+    #                           program by its `<id>-<filename>` entry,
+    #                           which is exactly what causes the
+    #                           "duplicate" prompt on rerun.
+    # ------------------------------------------------------------------
+
+    # Remove logs except the `server` subdirectory.
+    if [ -d ~/.akiba/logs ]; then
+        find ~/.akiba/logs -mindepth 1 -maxdepth 1 ! -name 'server' -exec rm -rf {} +
+    fi
+
+    # Remove cached binary copies.
+    rm -rf ~/.akiba/original ~/.akiba/processed
+
+    # Remove module workspace state.
+    rm -rf ~/.akiba/workspace/*
+
+    # Remove Ghidra project files (this is the actual fix for the
+    # "duplicate import" prompt on subsequent runs).
+    rm -rf ~/ghidra_projects/*
 
     echo "Test data cleaned up."
 

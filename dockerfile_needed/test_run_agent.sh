@@ -4,9 +4,65 @@
 TEST_EXIT_CODE=0
 
 # ============================================================================
+# CLI / env options
+# ============================================================================
+#
+#   -k, --keep-on-success   Skip cleanup if all tests pass, leaving the
+#                           agent_sessions/agent_messages tables, log
+#                           dirs, binary cache and Ghidra projects in
+#                           place for post-mortem debugging. A failing
+#                           run always cleans up.
+#
+# Equivalent env-var: KEEP_ON_SUCCESS=1
+# ============================================================================
+KEEP_ON_SUCCESS="${KEEP_ON_SUCCESS:-0}"
+for arg in "$@"; do
+    case "$arg" in
+        -k|--keep-on-success) KEEP_ON_SUCCESS=1 ;;
+        -h|--help)
+            cat <<EOF
+Usage: $(basename "$0") [options]
+
+Options:
+  -k, --keep-on-success   Do not run cleanup if the test succeeds.
+                          Useful for inspecting the agent transcript
+                          and session messages after a green run.
+                          A failing run always cleans up.
+  -h, --help              Show this help and exit.
+
+Environment:
+  KEEP_ON_SUCCESS=1       Same as --keep-on-success.
+EOF
+            exit 0
+            ;;
+        *) echo "Unknown option: $arg" >&2; exit 2 ;;
+    esac
+done
+
+# ============================================================================
 # Cleanup function — always runs regardless of test success/failure
 # ============================================================================
 cleanup() {
+    if [ "$TEST_EXIT_CODE" -eq 0 ] && [ "$KEEP_ON_SUCCESS" = "1" ]; then
+        echo ""
+        echo "********************************************************************************"
+        echo "**************** Skipping cleanup (--keep-on-success) **************************"
+        echo "********************************************************************************"
+        echo ""
+        echo "Agent test artifacts preserved for debugging:"
+        echo "  - DB tables:      agent_sessions, agent_messages, binaries"
+        echo "  - Logs:           ~/.akiba/logs/  (excluding 'server')"
+        echo "  - Binary cache:   ~/.akiba/original/, ~/.akiba/processed/"
+        echo "  - Workspace:      ~/.akiba/workspace/"
+        echo "  - Ghidra project: ~/ghidra_projects/"
+        echo ""
+        echo "********************************************************************************"
+        echo "******************** Agent Test Completed Successfully *************************"
+        echo "********************************************************************************"
+        echo ""
+        exit 0
+    fi
+
     echo ""
     echo "********************************************************************************"
     echo "******************************* Cleanup: Agent Test Data ***********************"
@@ -25,8 +81,27 @@ cleanup() {
     psql -p 31800 --dbname=akiba-instance -c "DELETE FROM binaries;" 2>/dev/null
     psql -p 31800 --dbname=akiba-instance -c "ALTER SEQUENCE binaries_id_seq RESTART WITH 1;" 2>/dev/null
 
-    # Remove logs so subsequent replay tests are not skipped due to duplicate detection
-    # rm -rf ~/.akiba/logs/*
+    # ------------------------------------------------------------------
+    # File-system cleanup — see test_run.sh for the full rationale.
+    # The Ghidra project removal is what actually prevents the
+    # "duplicate import" prompt on rerun. The `server` subdir under
+    # ~/.akiba/logs/ is preserved because it belongs to the long
+    # running akiba_server process and is not test data.
+    # ------------------------------------------------------------------
+
+    # Remove logs except the `server` subdirectory.
+    if [ -d ~/.akiba/logs ]; then
+        find ~/.akiba/logs -mindepth 1 -maxdepth 1 ! -name 'server' -exec rm -rf {} +
+    fi
+
+    # Remove cached binary copies.
+    rm -rf ~/.akiba/original ~/.akiba/processed
+
+    # Remove module workspace state.
+    rm -rf ~/.akiba/workspace/*
+
+    # Remove Ghidra project files (the actual fix for "duplicate import").
+    rm -rf ~/ghidra_projects/*
 
     echo "Agent test data cleaned up."
 
@@ -141,7 +216,7 @@ SESSION_COUNT=$(psql -p 31800 --dbname=akiba-instance -t -c \
 SESSION_COUNT=${SESSION_COUNT:--1}
 
 MESSAGE_COUNT=$(psql -p 31800 --dbname=akiba-instance -t -c \
-    "SELECT COUNT(*) FROM agent_messages m JOIN agent_sessions s ON m.session_id = s.id WHERE s.module_name = 'AkibaExample5';" 2>/dev/null | tr -d ' ')
+    "SELECT COUNT(*) FROM agent_messages m JOIN agent_sessions s ON m.session_id = s.session_id WHERE s.module_name = 'AkibaExample5';" 2>/dev/null | tr -d ' ')
 MESSAGE_COUNT=${MESSAGE_COUNT:--1}
 
 echo "agent_sessions (AkibaExample5) = $SESSION_COUNT (expected >= 1)"

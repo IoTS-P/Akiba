@@ -10,7 +10,7 @@ RUN wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O /usr/share/key
     echo "deb [signed-by=/usr/share/keyrings/postgresql-key.asc] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     apt-get update
 
-RUN apt-get install -y openjdk-21-jdk wget sudo zip unzip curl nginx pgbackrest postgresql-16 python3-bcrypt
+RUN apt-get install -y openjdk-21-jdk wget sudo zip unzip curl nginx pgbackrest postgresql-16 python3-bcrypt vim
 
 RUN curl -fsSL https://nodejs.org/dist/v20.12.2/node-v20.12.2-linux-x64.tar.gz | tar -xz -C /opt && \
     ln -sf /opt/node-v20.12.2-linux-x64 /opt/nodejs && \
@@ -29,6 +29,16 @@ RUN useradd -m -s /bin/bash akiba && \
 
 USER akiba
 WORKDIR /home/akiba
+
+COPY --chown=akiba:akiba subprojects/akiba_frontend /home/akiba/akiba_frontend
+
+RUN cd /home/akiba/akiba_frontend && npm install && npm run build && rm -rf node_modules
+
+COPY --chown=akiba:akiba dockerfile_needed/nginx.conf /etc/nginx/sites-available/akiba_frontend
+RUN sudo ln -sf /etc/nginx/sites-available/akiba_frontend /etc/nginx/sites-enabled/ && \
+    sudo rm /etc/nginx/sites-enabled/default || true && \
+    sudo sed -i 's/user www-data/user akiba/' /etc/nginx/nginx.conf && \
+    sudo sed -i 's/#user nobody/user akiba/' /etc/nginx/nginx.conf
 
 COPY --chown=akiba:akiba subprojects/akiba_db_daemon/build/distributions/akiba_db_daemon-${VERSION}.zip .
 #RUN wget https://github.com/IoTS-P/Akiba/releases/download/${VERSION}/akiba_db_daemon-${VERSION}.zip
@@ -53,15 +63,5 @@ RUN chmod +x /home/akiba/binaries/entrypoint.sh && \
     chmod +x /home/akiba/binaries/test_run.sh && \
     mkdir -p /home/akiba/akiba_framework/modules && \
     cp /home/akiba/binaries/amod*.jar /home/akiba/akiba_framework/modules/
-
-COPY --chown=akiba:akiba subprojects/akiba_frontend /home/akiba/akiba_frontend
-
-RUN cd /home/akiba/akiba_frontend && npm install && npm run build && rm -rf node_modules
-
-COPY --chown=akiba:akiba dockerfile_needed/nginx.conf /etc/nginx/sites-available/akiba_frontend
-RUN sudo ln -sf /etc/nginx/sites-available/akiba_frontend /etc/nginx/sites-enabled/ && \
-    sudo rm /etc/nginx/sites-enabled/default || true && \
-    sudo sed -i 's/user www-data/user akiba/' /etc/nginx/nginx.conf && \
-    sudo sed -i 's/#user nobody/user akiba/' /etc/nginx/nginx.conf
 
 WORKDIR /home/akiba/akiba_db_daemon
