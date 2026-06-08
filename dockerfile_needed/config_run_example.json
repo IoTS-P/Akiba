@@ -3,9 +3,6 @@
     "username": "akiba",
     "password": "akiba",
     "usingInstance": "akiba-instance",
-    "general": {
-      "binariesRoot": "/home/akiba/.akiba"
-    },
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_1",
@@ -37,9 +34,6 @@
     "username": "akiba",
     "password": "akiba",
     "usingInstance": "akiba-instance",
-    "general": {
-      "binariesRoot": "/home/akiba/.akiba"
-    },
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_2",
@@ -75,9 +69,6 @@
     "username": "akiba",
     "password": "akiba",
     "usingInstance": "akiba-instance",
-    "general": {
-      "binariesRoot": "/home/akiba/.akiba"
-    },
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_3",
@@ -107,9 +98,6 @@
     "username": "akiba",
     "password": "akiba",
     "usingInstance": "akiba-instance",
-    "general": {
-      "binariesRoot": "/home/akiba/.akiba"
-    },
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_4",
