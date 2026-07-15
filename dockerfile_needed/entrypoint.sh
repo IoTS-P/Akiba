@@ -259,6 +259,15 @@ if [ ! -f "$INIT_FLAG" ]; then
     echo ">>> Initialization finished"
 fi
 
+# ========== Apply staged updates (if any) ==========
+# The auto_update.sh --daemon process downloads new artifacts to a
+# staging directory.  We apply them HERE — before services start — so
+# the new code is live the moment the container comes up.  This is the
+# only safe window: JARs are not yet loaded by any process.
+if [ -f /home/akiba/binaries/auto_update.sh ]; then
+    /home/akiba/binaries/auto_update.sh --apply || true
+fi
+
 # ========== Start Main Services ==========
 
 # Start db daemon
@@ -284,6 +293,7 @@ nohup ./bin/akiba server \
     --db-password "${AKIBA_DB_PASSWORD}" \
     --daemon-host localhost \
     --daemon-port $DB_DAEMON_PORT \
+    --log-level DEBUG \
     > /tmp/akiba_server.log 2>&1 &
 echo $! > "$SERVER_PID"
 
@@ -320,6 +330,16 @@ echo "  - akiba_server:    http://localhost:${SERVER_PORT}"
 echo "  - akiba_frontend:  http://localhost:80"
 echo "=============================================="
 echo ""
+
+# ========== Start background update checker ==========
+# Checks GitHub for new releases every 3 days and downloads them to
+# the staging directory.  Updates are applied on the NEXT restart
+# (by the --apply block above).  The frontend can also trigger a
+# manual check via the /api/update/check endpoint.
+if [ -f /home/akiba/binaries/auto_update.sh ]; then
+    nohup /home/akiba/binaries/auto_update.sh --daemon > /tmp/auto_update.log 2>&1 &
+    echo ">>> Auto-update checker started (checks every 3 days)"
+fi
 
 # Block and wait for signals
 wait

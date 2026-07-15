@@ -47,3 +47,11 @@ bin/
 lib
 
 .opencode
+
+### Subprojects: keep only the listed modules, exclude everything else ###
+/subprojects/*
+!/subprojects/akiba_db_daemon/
+!/subprojects/akiba_framework/
+!/subprojects/akiba_mod_utils/
+!/subprojects/akiba_mod_example/
+!/subprojects/akiba_frontend/
