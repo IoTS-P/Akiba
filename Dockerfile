@@ -61,7 +61,10 @@ RUN mkdir /home/akiba/binaries
 COPY --chown=akiba:akiba dockerfile_needed /home/akiba/binaries
 RUN chmod +x /home/akiba/binaries/entrypoint.sh && \
     chmod +x /home/akiba/binaries/test_run.sh && \
+    chmod +x /home/akiba/binaries/auto_update.sh && \
     mkdir -p /home/akiba/akiba_framework/modules && \
-    cp /home/akiba/binaries/amod*.jar /home/akiba/akiba_framework/modules/
+    cp /home/akiba/binaries/amod*.jar /home/akiba/akiba_framework/modules/ && \
+    mkdir -p /home/akiba/.akiba && \
+    echo "${VERSION}" > /home/akiba/.akiba/current_version
 
 WORKDIR /home/akiba/akiba_db_daemon
