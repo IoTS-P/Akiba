@@ -2,7 +2,7 @@ services:
   app:
     container_name: akiba_all_in_one
     platform: linux/amd64
-    image: akiba_allinone:${VERSION:-4.2.0}
+    image: akiba_allinone:${VERSION:-4.3.0}
     network_mode: bridge  # Use existing virtual network
     build: .
     entrypoint: ["/home/akiba/binaries/entrypoint.sh"]
@@ -13,7 +13,7 @@ services:
     volumes:
       - akiba_data:/home/akiba/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:80 && curl -f http://localhost:8080/api/health && curl -f http://localhost:31777/test"]
+      test: ["CMD-SHELL", "curl -f --max-time 4 http://localhost:80 && curl -f --max-time 4 http://localhost:8080/api/health && curl -f --max-time 4 http://localhost:31777/test"]
       interval: 30s
       timeout: 5s
       retries: 3
