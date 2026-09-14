@@ -1,7 +1,7 @@
-# docker build -t akiba_allinone:4.3.0 .
+# docker build -t akiba_allinone:4.3.1 .
 
 FROM ubuntu:24.04
-ARG VERSION=4.3.0
+ARG VERSION=4.3.1
 
 RUN apt-get update --fix-missing && \
     apt-get install -y wget gnupg ca-certificates lsb-release

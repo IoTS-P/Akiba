@@ -118,7 +118,9 @@ cd /media/colin/white_pass/NEED_BACKUP/Firmwares/Akiba/subprojects/akiba_db_daem
 | 接口 | 方法 | 说明 |
 |-----|------|------|
 | `http://127.0.0.1:31777/test` | GET | 健康检查 |
-| `http://127.0.0.1:31777/instance/login` | POST | 用户登录 |
+| `http://127.0.0.1:31777/instance/login` | POST | 用户登录（失败等待 3 秒；24 小时内连续 5 次失败锁定 24 小时） |
+| `http://127.0.0.1:31777/instance/unlock` | POST | 解锁账户（需管理员 Token） |
+| `http://127.0.0.1:31777/backup/status` | POST | 查询实例是否有备份/恢复在运行（前端据此禁用备份按钮） |
 | `http://127.0.0.1:31777/instance/connect` | POST | 连接数据库实例 |
 | `http://127.0.0.1:31777/module/start` | POST | 标记任务开始 |
 | `http://127.0.0.1:31777/module/update` | POST | 更新任务数据 |
@@ -216,7 +218,6 @@ cd /home/akiba/akiba_framework
     "sqlSource": {
       "serverIP": "127.0.0.1",
       "serverPort": "31777",
-      "useSnapshot": "current",
       "constraint": "",
       "disableUpdate": false
     },
@@ -402,7 +403,7 @@ ls log/
   ./gradlew :subprojects:akiba_db_daemon:run
 
 □ 6. 创建数据库实例
-  ./gradlew run --args="instance-create -n akiba -u akiba"
+  ./gradlew run --args="instance-create -i <实例名> -u <用户名> -P <密码>"
 
 □ 7. 导入二进制文件
   ./gradlew run --args="-i import-example.json -c config.json@/main"
@@ -456,7 +457,7 @@ ls log/
 |----------------|-------------------------------------------|
 | DB Daemon 连接失败 | 检查 `127.0.0.1:31777` 是否可访问                |
 | 任务超时           | 增加 `timeout` 值或添加 `@IgnoreRuntimeTimeout` |
-| 数据库认证失败        | 确认 `username/password` 为 `akiba/akiba`    |
+| 数据库认证失败        | 确认用户名/口令与 `~/.akiba/users.json` 中的凭据一致（Akiba 不提供默认账号）；连续 5 次失败会锁定该账户 24 小时，管理员可在 Users 页面解锁 |
 | 模块找不到          | 确认 JAR 文件在 `modules/` 目录且以 `amod` 开头      |
-| Ghidra 版本不兼容   | 使用 Ghidra 11.3.2 版本                       |
+| Ghidra 版本不兼容   | 使用 Ghidra 12.1 版本                       |
 | Akiba 框架运行时崩溃  | 使用断点续传参数恢复还未完成的任务                         |

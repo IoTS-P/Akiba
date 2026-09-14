@@ -9,7 +9,28 @@ DB_DAEMON_PID="/tmp/akiba_db_daemon.pid"
 SERVER_PID="/tmp/akiba_server.pid"
 SERVER_PORT=8080
 DB_DAEMON_PORT=31777
-AKIBA_DB_PASSWORD="akiba123"
+AKIBA_DB_PORT=5432
+
+# ---------------------------------------------------------------------------
+# Database password
+# ---------------------------------------------------------------------------
+# No fixed password is shipped any more. The PostgreSQL password of the `akiba`
+# role is generated on first boot and kept in a file that only the akiba user
+# can read, so restarts reuse it. It is exported because the database daemon
+# (which owns the backup bookkeeping databases) and the Akiba server both need
+# it — the daemon refuses to run without a password rather than falling back to
+# a well-known default.
+PASSWORD_FILE="/home/akiba/.akiba/db_password"
+mkdir -p "$(dirname "$PASSWORD_FILE")"
+if [ -s "$PASSWORD_FILE" ]; then
+    AKIBA_DB_PASSWORD="$(cat "$PASSWORD_FILE")"
+else
+    AKIBA_DB_PASSWORD="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32)"
+    (umask 077; printf '%s' "$AKIBA_DB_PASSWORD" > "$PASSWORD_FILE")
+    chmod 600 "$PASSWORD_FILE"
+    echo ">>> Generated a new database password (stored in ${PASSWORD_FILE})"
+fi
+export AKIBA_DB_PASSWORD
 
 wait_for_service() {
     local url=$1
@@ -83,23 +104,15 @@ if [ $attempt -gt $max_pg_wait ]; then
     exit 1
 fi
 
-# Create users database for akiba_server if not exists
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'akiba_users'" | grep -q 1 || \
-    sudo -u postgres createdb -E UTF8 akiba_users || true
-
-# Create akiba user if not exists with password
+# Create the akiba role if missing. It owns every Akiba database, so it needs the
+# createdb right; the databases themselves are provisioned by prepare_database()
+# further down, always with akiba as their owner.
 if ! sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname = 'akiba'" | grep -q 1; then
     sudo -u postgres createuser -d akiba || true
 fi
 
 # Set password for akiba user
 sudo -u postgres psql -c "ALTER USER akiba WITH PASSWORD '${AKIBA_DB_PASSWORD}';" || true
-
-# Grant all privileges on akiba_users database to akiba user
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE akiba_users TO akiba;" || true
-sudo -u postgres psql -d akiba_users -c "GRANT ALL PRIVILEGES ON SCHEMA public TO akiba;" || true
-sudo -u postgres psql -d akiba_users -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO akiba;" || true
-sudo -u postgres psql -d akiba_users -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO akiba;" || true
 
 # Configure PostgreSQL to allow password authentication for local connections
 sudo sed -i 's/local   all             all                                     peer/local   all             all                                     md5/' /etc/postgresql/16/main/pg_hba.conf || true
@@ -109,94 +122,103 @@ sudo sed -i 's/host    all             all             ::1\/128                 
 # Reload PostgreSQL config
 sudo service postgresql reload || true
 
-# ========== Initialize akiba_server database and default user ==========
-if ! sudo -u postgres psql -d akiba_users -c "SELECT 1 FROM users LIMIT 1" > /dev/null 2>&1; then
-    echo ">>> Setting up akiba_server database schema and default user..."
+# ========== Provision the databases the akiba role owns ==========
+# Every Akiba database is created *owned by* akiba, so the tables the applications
+# create inside it are owned by akiba as well and start-up needs no ownership
+# fix-up. The table definitions live with the code that uses them, and are not
+# repeated here:
+#
+#   akiba_users  → ServerDatabase.initSchema()                     (users, user_sessions)
+#   akiba_backup → resources/backup_db_init.sql                    (db_backup_tree)
+#   per-instance → resources/database_init.sql, agent_database_init.sql
+#                  (applied by the daemon when it creates a user's instance; that
+#                   is where `scripts` lives — it is not part of akiba_users)
+#
+# "ALTER TABLE ... OWNER TO" statements used to live here for databases created by
+# images up to 4.3.0, whose entrypoint ran the server DDL itself as the postgres
+# superuser. Owning the database removes the cause instead of patching it: the
+# only remnant is the one-off bulk hand-over at the end of this function.
+prepare_database() {
+    local db="$1"
 
-    # Create tables using akiba_server's built-in schema creation
-    # Then create default user using Python bcrypt
-    sudo -u postgres psql -d akiba_users <<'EOF'
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS user_sessions (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    token VARCHAR(512) UNIQUE NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    expires_at TIMESTAMPTZ NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS scripts (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    code TEXT NOT NULL,
-    output TEXT,
-    status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMPTZ DEFAULT now(),
-    finished_at TIMESTAMPTZ
-);
-EOF
-else
-    echo ">>> akiba_server database already initialized"
-fi
-
-# ========== Initialize backup database akiba_backup ==========
-
-DB_NAME=akiba_backup
-
-DB_EXISTS=$(sudo -u postgres psql -tAc \
-    "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}';")
-
-if [[ "$DB_EXISTS" != "1" ]]; then
-    echo "Database '${DB_NAME}' does not exist. Creating..."
-
-    sudo -u postgres psql <<EOF
-CREATE DATABASE ${DB_NAME}
-    OWNER akiba;
-EOF
-
-    echo "Database '${DB_NAME}' created with owner akiba."
-else
-    CURRENT_OWNER=$(sudo -u postgres psql -tAc \
-        "SELECT pg_catalog.pg_get_userbyid(datdba)
-         FROM pg_database
-         WHERE datname='${DB_NAME}';")
-
-    if [[ "$CURRENT_OWNER" != akiba ]]; then
-        echo "Database '${DB_NAME}' exists but owner is '${CURRENT_OWNER}', fixing..."
-
-        sudo -u postgres psql -c \
-            "ALTER DATABASE ${DB_NAME} OWNER TO akiba;"
-
-        echo "Database owner updated to akiba."
+    if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${db}'" | grep -q 1; then
+        sudo -u postgres psql -c "CREATE DATABASE ${db} OWNER akiba;" > /dev/null 2>&1 \
+            && echo ">>> Database '${db}' created (owner akiba)"
     else
-        echo "Database '${DB_NAME}' already exists with correct owner."
+        local owner
+        owner=$(sudo -u postgres psql -tAc \
+            "SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname='${db}';")
+        if [[ "$owner" != "akiba" ]]; then
+            echo ">>> Database '${db}' exists with owner '${owner}'; transferring to akiba"
+            sudo -u postgres psql -c "ALTER DATABASE ${db} OWNER TO akiba;" > /dev/null 2>&1
+        fi
     fi
-fi
 
-sudo -u postgres psql <<EOF
-GRANT CONNECT, CREATE, TEMP ON DATABASE ${DB_NAME} TO akiba;
-
-\\c ${DB_NAME}
-
+    # PostgreSQL 15+ ties the public schema to pg_database_owner, so owning the
+    # database is already enough to create tables in it; the rest keeps databases
+    # created by older PostgreSQL setups working.
+    sudo -u postgres psql -d "${db}" > /dev/null 2>&1 <<'SQL' || true
 ALTER SCHEMA public OWNER TO akiba;
 GRANT USAGE, CREATE ON SCHEMA public TO akiba;
-
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO akiba;
+GRANT ALL PRIVILEGES ON ALL TABLES    IN SCHEMA public TO akiba;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO akiba;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES    TO akiba;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO akiba;
+SQL
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-GRANT ALL ON TABLES TO akiba;
+    # Objects created by images up to 4.3.0 belong to the postgres superuser, and a
+    # table owned by postgres makes a later migration such as "add users.is_admin"
+    # fail with `ERROR: must be owner of table users`. They are handed over here, so
+    # upgrading needs no manual step; a fresh database is owned by akiba, so there is
+    # usually nothing to do.
+    #
+    # The names come from the catalog instead of a hardcoded list (the previous list
+    # had already drifted: `scripts` does not live in this database), and the hand-over
+    # has to be one `ALTER TABLE/SEQUENCE ... OWNER TO` per object, because
+    # `REASSIGN OWNED BY postgres` is refused with "cannot reassign ownership of
+    # objects owned by role postgres because they are required by the database system".
+    local foreign
+    foreign=$(sudo -u postgres psql -d "${db}" -tAc \
+        "SELECT count(*) FROM pg_class c
+           JOIN pg_roles r ON r.oid = c.relowner
+          WHERE r.rolname = 'postgres'
+            AND c.relkind IN ('r','S')
+            AND c.relnamespace = 'public'::regnamespace;")
+    if [[ "${foreign:-0}" != "0" ]]; then
+        echo ">>> Database '${db}': ${foreign} table(s)/sequence(s) from an older image are owned by 'postgres'; transferring to akiba"
+        sudo -u postgres psql -d "${db}" -v ON_ERROR_STOP=1 <<'SQL' \
+            || echo ">>> WARNING: ownership transfer failed (see above). The server prints the exact statement it needs if a migration hits such a table."
+DO $$
+DECLARE obj record;
+BEGIN
+    FOR obj IN
+        SELECT c.relname, c.relkind
+          FROM pg_class c
+          JOIN pg_roles r ON r.oid = c.relowner
+         WHERE r.rolname = 'postgres'
+           AND c.relkind IN ('r','S')
+           AND c.relnamespace = 'public'::regnamespace
+    LOOP
+        IF obj.relkind = 'S' THEN
+            EXECUTE format('ALTER SEQUENCE public.%I OWNER TO akiba', obj.relname);
+        ELSE
+            EXECUTE format('ALTER TABLE public.%I OWNER TO akiba', obj.relname);
+        END IF;
+        RAISE NOTICE 'owner of % set to akiba', obj.relname;
+    END LOOP;
+END
+$$;
+SQL
+    fi
+}
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-GRANT ALL ON SEQUENCES TO akiba;
-EOF
+echo ">>> Preparing the databases owned by 'akiba'..."
+prepare_database akiba_users
+
+# ========== Backup database akiba_backup (same owner rules) ==========
+
+DB_NAME=akiba_backup
+prepare_database "${DB_NAME}"
 
 DB_INIT_SQL="./resources/backup_db_init.sql"
 
@@ -207,54 +229,31 @@ fi
 
 echo "Executing SQL file '$DB_INIT_SQL' on database '$DB_NAME'..."
 
+# Run the file *as akiba* (SET ROLE) so the objects it creates are owned by akiba
+# straight away, like everything else in a database this script provisions. Applied
+# as postgres they would be owned by the superuser, and the daemon — which connects
+# as akiba — would only keep working thanks to the blanket GRANTs below, while any
+# later ALTER on those tables would need the same ownership repair the server tables
+# needed.
 sudo -u postgres psql \
     --dbname="$DB_NAME" \
     --set=ON_ERROR_STOP=on \
+    --command="SET ROLE akiba;" \
     --file="$DB_INIT_SQL"
 
 echo "SQL initialization completed successfully."
 
 # ========== First Time Initialization ==========
+# Nothing is created here on purpose. Earlier versions of this script created a
+# default instance (`akiba-instance`) at first boot, which then belonged to
+# whichever default account the script also created. Instances are now created
+# by the user who wants one, on their first visit to the web UI, and no account
+# is shipped at all (the first visit offers a setup form for the administrator).
+#
+# The flag file is still written so that a container restarted from an older
+# image does not re-run the (now removed) initialization once.
 if [ ! -f "$INIT_FLAG" ]; then
-    echo ">>> First time startup, initializing..."
-
-    # 1. Start temporary db daemon
-    echo ">>> Running temporary akiba_db_daemon..."
-    cd "$DAEMON_DIR"
-    nohup ./bin/akiba_db_daemon -c "$CONFIG" > /dev/null 2>&1 &
-    DAEMON_PID=$!
-    echo $DAEMON_PID > "$DB_DAEMON_PID"
-
-    # 2. Wait for db daemon HTTP ready
-    if ! wait_for_service "http://localhost:${DB_DAEMON_PORT}/test"; then
-        echo ">>> Database daemon failed to start"
-        cat /home/akiba/.akiba/daemon.log || true
-        exit 1
-    fi
-
-    # 3. Create default instance
-    echo ">>> Creating PostgreSQL instance for akiba..."
-    cd "$FRAMEWORK_DIR"
-    if ! ./bin/akiba instance-create \
-        -i akiba-instance \
-        -u akiba \
-        -P akiba; then
-        echo ">>> Instance creation failed"
-        if [ -f /home/akiba/.akiba/daemon.log ]; then
-            echo ">>> Tail of daemon log (/home/akiba/.akiba/daemon.log):"
-            echo "----------------------------------------------------------------"
-            tail -n 200 /home/akiba/.akiba/daemon.log || true
-            echo "----------------------------------------------------------------"
-        else
-            echo ">>> Daemon log not found at /home/akiba/.akiba/daemon.log"
-        fi
-        exit 1
-    fi
-
-    # 4. Stop temporary db daemon (but NOT PostgreSQL)
-    cleanup
-
-    # 5. Create flag file
+    echo ">>> First time startup: no default account or instance is created."
     touch "$INIT_FLAG"
     echo ">>> Initialization finished"
 fi
@@ -293,7 +292,6 @@ nohup ./bin/akiba server \
     --db-password "${AKIBA_DB_PASSWORD}" \
     --daemon-host localhost \
     --daemon-port $DB_DAEMON_PORT \
-    --log-level DEBUG \
     > /tmp/akiba_server.log 2>&1 &
 echo $! > "$SERVER_PID"
 
@@ -304,20 +302,9 @@ if ! wait_for_service "http://localhost:${SERVER_PORT}/api/health"; then
     exit 1
 fi
 
-# Create default user if not exists
-if ! sudo -u postgres psql -d akiba_users -c "SELECT 1 FROM users WHERE username='akiba'" | grep -q 1; then
-    echo ">>> Creating default user 'akiba'..."
-    REGISTER_RESP=$(curl -s -X POST "http://localhost:${SERVER_PORT}/api/auth/register" \
-        -H "Content-Type: application/json" \
-        -d "{\"username\":\"akiba\",\"password\":\"akiba123\"}" || echo "")
-    if echo "$REGISTER_RESP" | grep -q "token"; then
-        echo ">>> Default user 'akiba' created successfully"
-    else
-        echo ">>> Warning: Failed to create default user"
-    fi
-else
-    echo ">>> Default user 'akiba' already exists"
-fi
+# No default account is created. Open the web UI once and complete the setup
+# form: it creates the first (administrator) account, and the first user then
+# creates their own database instance.
 
 echo ">>> Starting nginx for frontend..."
 sudo nginx

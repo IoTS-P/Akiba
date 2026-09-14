@@ -68,6 +68,23 @@ else
 fi
 echo ""
 
+# ---------------------------------------------------------------------------
+# Step 1.2.5: Bootstrap the daemon credential and the test instance
+# ---------------------------------------------------------------------------
+# No account and no instance are created at start-up any more, so create what
+# the tests need here — exactly like a first-time user would. A no-op when the
+# instance already exists (e.g. the test database was kept between runs).
+echo ">>> Step 1.2.5: Ensuring daemon credential and test instance exist..."
+INSTANCE_MAP="${HOME}/.akiba/instances.json"
+if ! grep -q '"akiba-instance"' "${INSTANCE_MAP}" 2>/dev/null; then
+    log_info "Creating instance 'akiba-instance' (registers the 'akiba' credential as well)..."
+    ( cd "${AKIBA_FRAMEWORK_DIR}" && ./bin/akiba instance-create -i akiba-instance -u akiba -P akiba ) \
+        || log_warn "instance-create failed"
+else
+    log_info "Instance 'akiba-instance' already exists."
+fi
+echo ""
+
 echo ">>> Step 1.3: Run import and process test tasks..."
 cd "${AKIBA_FRAMEWORK_DIR}" || exit 1
 
@@ -98,11 +115,8 @@ fi
 echo ""
 
 echo ">>> Step 1.5: Test instance management commands..."
-log_info "Testing instance-list..."
-"${AKIBA_BIN}" instance-list || log_warn "instance-list failed"
-
-log_info "Testing instance-status..."
-"${AKIBA_BIN}" instance-status -i akiba-instance || log_warn "instance-status failed"
+log_info "Testing instance-list (lists the instances owned by 'akiba')..."
+"${AKIBA_BIN}" instance-list -u akiba -P akiba || log_warn "instance-list failed"
 echo ""
 
 echo "********************************************************************************"
@@ -140,62 +154,61 @@ echo ""
 
 echo ">>> Step 2.3: Test authentication endpoints..."
 
-echo "  - POST /api/auth/register (new user)"
-REGISTER_RESPONSE=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/register \
-    -H "Content-Type: application/json" \
-    -d '{"username":"testuser1","password":"testpass123"}')
-if echo "$REGISTER_RESPONSE" | grep -q '"token"'; then
-    TEST_TOKEN=$(echo "$REGISTER_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-    TEST_USER_ID=$(echo "$REGISTER_RESPONSE" | grep -o '"userId":[0-9]*' | cut -d':' -f2)
-    log_info "  POST /api/auth/register - OK: userId=${TEST_USER_ID}"
+echo "  - POST /api/auth/setup-status"
+SETUP_STATUS=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/setup-status)
+if echo "$SETUP_STATUS" | grep -q 'needsSetup'; then
+    log_info "  POST /api/auth/setup-status - OK: ${SETUP_STATUS}"
 else
-    log_warn "  POST /api/auth/register - Failed or user exists: ${REGISTER_RESPONSE}"
-    echo "  - POST /api/auth/login (existing user)"
-    REGISTER_RESPONSE=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/login \
-        -H "Content-Type: application/json" \
-        -d '{"username":"testuser1","password":"testpass123"}')
-    if echo "$REGISTER_RESPONSE" | grep -q '"token"'; then
-        TEST_TOKEN=$(echo "$REGISTER_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-        TEST_USER_ID=$(echo "$REGISTER_RESPONSE" | grep -o '"userId":[0-9]*' | cut -d':' -f2)
-        log_info "  POST /api/auth/login - OK: userId=${TEST_USER_ID}"
-    else
-        log_error "  POST /api/auth/login - Failed: ${REGISTER_RESPONSE}"
-    fi
+    log_error "  POST /api/auth/setup-status - Failed: ${SETUP_STATUS}"
+    SETUP_STATUS='{"needsSetup":false}'
 fi
 
 echo ""
-echo "  - POST /api/auth/login (valid credentials)"
-LOGIN_RESPONSE=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{"username":"testuser1","password":"testpass123"}')
-if echo "$LOGIN_RESPONSE" | grep -q '"token"'; then
-    TEST_TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-    TEST_USER_ID=$(echo "$LOGIN_RESPONSE" | grep -o '"userId":[0-9]*' | cut -d':' -f2)
-    log_info "  POST /api/auth/login - OK: userId=${TEST_USER_ID}"
+if echo "$SETUP_STATUS" | grep -q '"needsSetup":true'; then
+    # Self-registration no longer exists: the first account is created through
+    # the setup endpoint, which is only accepted while no user exists.
+    echo "  - POST /api/auth/setup (creates the first administrator)"
+    AUTH_RESPONSE=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/setup \
+        -H "Content-Type: application/json" \
+        -d '{"username":"testadmin","password":"testpass123"}')
 else
-    log_error "  POST /api/auth/login - Failed: ${LOGIN_RESPONSE}"
+    echo "  - POST /api/auth/setup - skipped (setup already completed)"
+    echo "  - POST /api/auth/login (test administrator)"
+    AUTH_RESPONSE=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/login \
+        -H "Content-Type: application/json" \
+        -d '{"username":"testadmin","password":"testpass123"}')
+fi
+if echo "$AUTH_RESPONSE" | grep -q '"token"'; then
+    TEST_TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+    TEST_USER_ID=$(echo "$AUTH_RESPONSE" | grep -o '"userId":[0-9]*' | cut -d':' -f2)
+    log_info "  Authentication - OK: userId=${TEST_USER_ID}"
+else
+    log_error "  Authentication - Failed: ${AUTH_RESPONSE}"
 fi
 
 echo ""
 echo "  - POST /api/auth/login (invalid credentials)"
-INVALID_LOGIN=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/login \
+INVALID_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/login \
     -H "Content-Type: application/json" \
-    -d '{"username":"testuser1","password":"wrongpassword"}')
-if echo "$INVALID_LOGIN" | grep -q '"message"'; then
-    log_info "  POST /api/auth/login (invalid) - OK: rejected as expected"
+    -d '{"username":"testadmin","password":"wrongpassword"}')
+if [ "$INVALID_STATUS" = "401" ]; then
+    log_info "  POST /api/auth/login (invalid) - OK: rejected with 401"
 else
-    log_warn "  POST /api/auth/login (invalid) - Unexpected response: ${INVALID_LOGIN}"
+    log_warn "  POST /api/auth/login (invalid) - Unexpected status: ${INVALID_STATUS}"
 fi
 
 echo ""
-echo "  - POST /api/auth/register (duplicate username)"
-DUPE_REGISTER=$(curl -sf -X POST http://${SERVER_HOST}:${SERVER_PORT}/api/auth/register \
-    -H "Content-Type: application/json" \
-    -d '{"username":"testuser1","password":"anotherpass"}')
-if echo "$DUPE_REGISTER" | grep -q '"message"' || echo "$DUPE_REGISTER" | grep -q '"error"'; then
-    log_info "  POST /api/auth/register (duplicate) - OK: rejected as expected"
+echo "  - GET /api/admin/users (administrator only)"
+if [ -n "${TEST_TOKEN}" ]; then
+    ADMIN_USERS=$(curl -sf -H "Authorization: Bearer ${TEST_TOKEN}" \
+        http://${SERVER_HOST}:${SERVER_PORT}/api/admin/users)
+    if echo "$ADMIN_USERS" | grep -q '"users"'; then
+        log_info "  GET /api/admin/users - OK: ${ADMIN_USERS}"
+    else
+        log_warn "  GET /api/admin/users - Unexpected: ${ADMIN_USERS}"
+    fi
 else
-    log_warn "  POST /api/auth/register (duplicate) - Unexpected: ${DUPE_REGISTER}"
+    log_warn "  GET /api/admin/users - skipped (no token)"
 fi
 
 echo ""

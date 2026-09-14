@@ -154,6 +154,22 @@ fail() {
 # Step 1: Check Database Daemon
 # ============================================================================
 
+# ---------------------------------------------------------------------------
+# Step 0: Bootstrap the daemon credential and the test instance
+# ---------------------------------------------------------------------------
+# Akiba ships no default account and creates no instance at start-up: the first
+# user sets up the administrator account and then creates their own instance.
+# This step does the same, so the test suite works on a pristine deployment. It
+# is a no-op when the instance already exists.
+echo ">>> Step 0: Ensuring the daemon credential and the test instance exist..."
+FW_DIR="${AKIBA_FRAMEWORK_DIR:-/home/akiba/akiba_framework}"
+INSTANCE_MAP="${HOME}/.akiba/instances.json"
+if ! grep -q '"akiba-instance"' "${INSTANCE_MAP}" 2>/dev/null; then
+    ( cd "${FW_DIR}" && ./bin/akiba instance-create -i akiba-instance -u akiba -P akiba ) \
+        || echo "WARNING: could not create the test instance"
+fi
+echo ""
+
 echo ""
 echo "********************************************************************************"
 echo "******************************* Step 1: Check Database Daemon ******************"

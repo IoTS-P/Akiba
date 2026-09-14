@@ -11,8 +11,10 @@
     "healthCheck": "GET /api/health",
     "rootCheck": "GET /",
     "auth": {
-      "defaultUsername": "akiba",
-      "defaultPassword": "akiba123",
+      "note": "Akiba 不内置任何账号：首次打开界面时用 /api/auth/setup 建立第一个管理员，之后由管理员通过 /api/admin/users 添加用户。",
+      "setupStatus": "POST /api/auth/setup-status   (needsSetup 为 true 时前端显示初始化表单)",
+      "setup": "POST /api/auth/setup          (仅在系统中还没有任何用户时可用)",
+      "login": "POST /api/auth/login",
       "header": "Authorization: Bearer <token>",
       "instanceHeader": "X-Akiba-Instance"
     }
@@ -24,91 +26,100 @@
   },
   "frontend": {
     "url": "http://localhost",
-    "defaultInstance": "akiba-instance"
+    "note": "实例由登录用户在首次进入时自行创建，不存在默认实例"
   },
   "endpoints": {
     "auth": {
-      "register":  "POST /api/auth/register",
-      "login":     "POST /api/auth/login",
-      "logout":    "POST /api/auth/logout",
-      "me":        "GET  /api/auth/me"
+      "setupStatus": "POST /api/auth/setup-status",
+      "setup": "POST /api/auth/setup",
+      "login": "POST /api/auth/login",
+      "logout": "POST /api/auth/logout",
+      "me": "GET  /api/auth/me"
     },
     "instances": {
-      "list":      "GET    /api/instances?probe=<name>",
-      "create":    "POST   /api/instances/create",
-      "delete":    "POST   /api/instances/delete",
-      "start":     "POST   /api/instances/start",
-      "shutdown":  "POST   /api/instances/shutdown",
-      "backup":    "POST   /api/instances/backup"
+      "list": "GET  /api/instances            (返回当前用户拥有的实例)",
+      "create": "POST /api/instances/create",
+      "delete": "POST /api/instances/delete",
+      "start": "POST /api/instances/start",
+      "shutdown": "POST /api/instances/shutdown",
+      "backup": "POST /api/instances/backup",
+      "backups": "GET  /api/instances/backups?instance=<name>",
+      "restore": "POST /api/instances/restore    (JSON: {instanceName,backup,confirm:true}；未确认会被拒绝)"
     },
     "files": {
-      "list":      "GET    /api/files?offset=0&limit=20",
-      "search":    "GET    /api/files/search?q=<kw>",
-      "import":    "POST   /api/files/import          (multipart)",
-      "importStream":"GET  /api/files/import/stream/{taskId}",
-      "delete":    "DELETE /api/files                 (JSON body: {fileIds:[]})"
+      "list": "GET    /api/files?offset=0&limit=20",
+      "search": "GET    /api/files/search?q=<kw>",
+      "import": "POST   /api/files/import          (multipart)",
+      "importStream": "GET  /api/files/import/stream/{taskId}",
+      "delete": "DELETE /api/files                 (JSON body: {fileIds:[]})"
     },
     "workflow": {
-      "projects":     "GET  /api/workflow/projects",
-      "start":        "POST /api/workflow/start",
-      "stop":         "POST /api/workflow/stop/{id}",
-      "status":       "GET  /api/workflow/status/{id}",
-      "stream":       "GET  /api/workflow/stream/{id}",
-      "running":      "GET  /api/workflow/running",
-      "history":      "GET  /api/workflow/history",
-      "logs":         "GET  /api/workflow/logs/{id}",
-      "fileLogs":     "GET  /api/workflow/file-logs/{id}/{fileId}",
+      "projects": "GET  /api/workflow/projects",
+      "start": "POST /api/workflow/start",
+      "stop": "POST /api/workflow/stop/{id}",
+      "status": "GET  /api/workflow/status/{id}",
+      "stream": "GET  /api/workflow/stream/{id}",
+      "running": "GET  /api/workflow/running",
+      "history": "GET  /api/workflow/history",
+      "logs": "GET  /api/workflow/logs/{id}",
+      "fileLogs": "GET  /api/workflow/file-logs/{id}/{fileId}",
       "progressPost": "POST /api/progress              (子进程回调)"
     },
     "scripts": {
-      "list":        "GET    /api/scripts?limit=100&offset=0&query=",
-      "get":         "GET    /api/scripts/{id}",
-      "create":      "POST   /api/scripts",
-      "update":      "PUT    /api/scripts/{id}",
-      "delete":      "DELETE /api/scripts/{id}",
-      "run":         "POST   /api/scripts/{id}/run      (JSON: {binaryIds:[],parallel:true})",
-      "executions":  "GET    /api/scripts/{id}/executions",
-      "getExecution":"GET    /api/executions/{id}"
+      "list": "GET    /api/scripts?limit=100&offset=0&query=",
+      "get": "GET    /api/scripts/{id}",
+      "create": "POST   /api/scripts",
+      "update": "PUT    /api/scripts/{id}",
+      "delete": "DELETE /api/scripts/{id}",
+      "run": "POST   /api/scripts/{id}/run      (JSON: {binaryIds:[],parallel:true})",
+      "executions": "GET    /api/scripts/{id}/executions",
+      "getExecution": "GET    /api/executions/{id}"
     },
     "query": {
-      "execute":  "POST /api/query     (JSON: {sql,instanceName?})",
-      "history":  "GET  /api/query/history"
+      "execute": "POST /api/query     (JSON: {sql,instanceName?})",
+      "history": "GET  /api/query/history"
     },
     "agent": {
-      "listSessions":  "GET    /api/agent/sessions?limit=50&offset=0&parentSessionId=",
-      "getSession":    "GET    /api/agent/sessions/{id}",
-      "children":      "GET    /api/agent/sessions/{id}/children",
+      "listSessions": "GET    /api/agent/sessions?limit=50&offset=0&parentSessionId=",
+      "getSession": "GET    /api/agent/sessions/{id}",
+      "children": "GET    /api/agent/sessions/{id}/children",
       "createSession": "POST   /api/agent/sessions",
-      "messages":      "GET    /api/agent/sessions/{id}/messages",
-      "chat":          "POST   /api/agent/sessions/{id}/chat  (JSON: {content, systemPrompt?})",
+      "messages": "GET    /api/agent/sessions/{id}/messages",
+      "chat": "POST   /api/agent/sessions/{id}/chat  (JSON: {content, systemPrompt?})",
       "deleteSession": "DELETE /api/agent/sessions/{id}",
-      "export":        "GET    /api/agent/sessions/{id}/export?scope=self|tree"
+      "export": "GET    /api/agent/sessions/{id}/export?scope=self|tree"
     },
     "skills": {
-      "list":     "GET    /api/skills",
-      "get":      "GET    /api/skills/{skillId}?maxChars=20000&path=",
-      "getFile":  "GET    /api/skills/{skillId}/file?path=&maxChars=20000",
-      "upload":   "POST   /api/skills/upload       (multipart, 必须 .zip)",
-      "delete":   "DELETE /api/skills/{skillId}"
+      "list": "GET    /api/skills",
+      "get": "GET    /api/skills/{skillId}?maxChars=20000&path=",
+      "getFile": "GET    /api/skills/{skillId}/file?path=&maxChars=20000",
+      "upload": "POST   /api/skills/upload       (multipart, 必须 .zip)",
+      "delete": "DELETE /api/skills/{skillId}"
     },
     "projects": {
-      "list":             "GET  /api/projects",
-      "exportGar":        "GET  /api/projects/{name}/export             (application/zip → .gar)",
+      "list": "GET  /api/projects",
+      "exportGar": "GET  /api/projects/{name}/export             (application/zip → .gar)",
       "exportTextStatus": "GET  /api/projects/{name}/export_text/status",
-      "exportText":       "POST /api/projects/{name}/export_text        (application/zip → listing/decompile/comments zip)"
+      "exportText": "POST /api/projects/{name}/export_text        (application/zip → listing/decompile/comments zip)"
     },
     "llm": {
       "providers": "GET    /api/llm/providers",
-      "keys":      "GET    /api/llm/keys",
-      "addKey":    "POST   /api/llm/keys",
+      "keys": "GET    /api/llm/keys",
+      "addKey": "POST   /api/llm/keys",
       "deleteKey": "DELETE /api/llm/keys?provider=&modelName=",
-      "models":    "GET    /api/llm/models?provider=&apiKey=&baseUrl="
+      "models": "GET    /api/llm/models?provider=&apiKey=&baseUrl="
     },
     "runtimeConfigs": {
-      "list":   "GET    /api/runtime-configs",
-      "get":    "GET    /api/runtime-configs/{name}",
-      "save":   "PUT    /api/runtime-configs",
+      "list": "GET    /api/runtime-configs",
+      "get": "GET    /api/runtime-configs/{name}",
+      "save": "PUT    /api/runtime-configs",
       "delete": "DELETE /api/runtime-configs/{name}"
+    },
+    "admin": {
+      "listUsers": "GET    /api/admin/users",
+      "createUser": "POST   /api/admin/users          (JSON: {username,password,isAdmin})",
+      "deleteUser": "DELETE /api/admin/users/{id}",
+      "resetPassword": "POST  /api/admin/users/{id}/password (JSON: {password})"
     }
   },
   "scripts_local": {

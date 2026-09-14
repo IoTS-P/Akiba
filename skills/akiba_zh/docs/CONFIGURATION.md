@@ -42,7 +42,6 @@ Akiba 使用 JSON 格式配置文件，通过 `-c` 参数指定。配置文件�
     "sqlSource": {
       "serverIP": "127.0.0.1",
       "serverPort": "31777",
-      "useSnapshot": "current",
       "constraint": "",
       "disableUpdate": false
     },
@@ -228,14 +227,6 @@ Akiba 数据库守护进程地址。
 ```json
 "serverIP": "127.0.0.1",
 "serverPort": "31777"
-```
-
-#### sqlSource.useSnapshot
-
-数据库快照选择，当前保留。
-
-```json
-"useSnapshot": "current"
 ```
 
 #### sqlSource.constraint

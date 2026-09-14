@@ -1,8 +1,8 @@
 {
   "process_1": {
-    "username": "akiba",
-    "password": "akiba",
-    "usingInstance": "akiba-instance",
+    "username": "<your-database-user>",
+    "password": "<your-password>",
+    "usingInstance": "<your-instance-name>",
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_1",
@@ -13,7 +13,6 @@
     "sqlSource": {
       "serverIP": "127.0.0.1",
       "serverPort": 31777,
-      "useSnapshot": "current",
       "constraint": "WHERE original_path LIKE '%import_example.elf'",
       "disableUpdate": false
     },
@@ -31,9 +30,9 @@
     ]
   },
   "process_2": {
-    "username": "akiba",
-    "password": "akiba",
-    "usingInstance": "akiba-instance",
+    "username": "<your-database-user>",
+    "password": "<your-password>",
+    "usingInstance": "<your-instance-name>",
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_2",
@@ -44,7 +43,6 @@
     "sqlSource": {
       "serverIP": "127.0.0.1",
       "serverPort": 31777,
-      "useSnapshot": "current",
       "constraint": "WHERE original_path LIKE '%import_example.elf'",
       "disableUpdate": false
     },
@@ -66,9 +64,9 @@
     ]
   },
   "process_3": {
-    "username": "akiba",
-    "password": "akiba",
-    "usingInstance": "akiba-instance",
+    "username": "<your-database-user>",
+    "password": "<your-password>",
+    "usingInstance": "<your-instance-name>",
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_3",
@@ -79,7 +77,6 @@
     "sqlSource": {
       "serverIP": "127.0.0.1",
       "serverPort": 31777,
-      "useSnapshot": "current",
       "constraint": "WHERE original_path LIKE '%import_example.elf'",
       "disableUpdate": false
     },
@@ -95,9 +92,9 @@
     ]
   },
   "process_4": {
-    "username": "akiba",
-    "password": "akiba",
-    "usingInstance": "akiba-instance",
+    "username": "<your-database-user>",
+    "password": "<your-password>",
+    "usingInstance": "<your-instance-name>",
     "withGhidraProject": {
       "projectRoot": "/home/akiba/ghidra_projects",
       "name": "example_project_4",
@@ -108,7 +105,6 @@
     "sqlSource": {
       "serverIP": "127.0.0.1",
       "serverPort": 31777,
-      "useSnapshot": "current",
       "constraint": "WHERE original_path LIKE '%import_example.elf'",
       "disableUpdate": false
     },

@@ -49,9 +49,9 @@ cat skills/akiba_zh/akiba_config.json
 | `daemon.host` / `daemon.port` | 数据库守护进程地址                                                       |
 
 注意：
-- 若`akiba.home`为空或无效，且**需要自行开发模块**，需要从 Github 仓库 https://github.com/IoTS-P/Akiba.git 拉取，并按照仓库中的 README.md 拉取子模块，另外需要从 Github 下载 11.3.2 版本的 Ghidra：
-  1. 从 https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_11.3.2_build/ghidra_11.3.2_PUBLIC_20250415.zip 下载 Ghidra 11.3.2 发布包
-  2. 解压发布包进入 `ghidra_11.3.2_PUBLIC/support`，在 Linux 系统中运行 `./buildGhidraJar` 脚本（如果没有权限则首先赋予），在 Windows 系统下运行 `buildGhidraJar.bat` 脚本。运行后将在 `ghidra_11.3.2_PUBLIC/support` 中生成 `ghidra.jar`。
+- 若`akiba.home`为空或无效，且**需要自行开发模块**，需要从 Github 仓库 https://github.com/IoTS-P/Akiba.git 拉取，并按照仓库中的 README.md 拉取子模块，另外需要从 Github 下载 12.1 版本的 Ghidra：
+  1. 从 https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.1_build 下载 Ghidra 12.1 发布包
+  2. 解压发布包进入 `ghidra_12.1_PUBLIC/support`，在 Linux 系统中运行 `./buildGhidraJar` 脚本（如果没有权限则首先赋予），在 Windows 系统下运行 `buildGhidraJar.bat` 脚本。运行后将在 `ghidra_12.1_PUBLIC/support` 中生成 `ghidra.jar`。
   3. 将 `ghidra.jar` 复制到 Akiba 源码仓库根目录内库目录（`akiba.home`内的`lib`）
 - 要运行 Akiba 框架，需要首先 cd 到发布程序根目录（`akiba.executableRoot`）后使用 `./bin/akiba_framework` 启动，不得在其他位置运行
 
@@ -70,7 +70,7 @@ curl -s "http://127.0.0.1:31777/test"
 |-------|---------|------|
 | Java | 21+ | 必须使用 JDK 21，低版本会导致运行时错误 |
 | Kotlin | 2.1.20+ | 框架开发语言 |
-| Ghidra | 11.3.2 | 二进制分析引擎（其他版本 API 不兼容） |
+| Ghidra | 12.1 | 二进制分析引擎（其他版本 API 不兼容） |
 | PostgreSQL | 最新稳定版 | 数据存储，由数据库守护进程管理 |
 
 #### 初始化步骤
@@ -130,7 +130,7 @@ Akiba 为每个任务创建 2 个协程上下文：
   "main": {
     "username": "akiba",
     "password": "akiba",
-    "usingInstance": "akiba-instance",
+    "usingInstance": "<你的实例名>",
     "general": {
       "binariesRoot": "/data/binaries",
       "threads": 1,
@@ -156,7 +156,7 @@ Akiba 为每个任务创建 2 个协程上下文：
 }
 ```
 
-注：Akiba Docker 默认已经创建了 akiba 用户和 akiba-instance 数据库实例，
+注：Akiba Docker **不创建任何默认用户或实例**。首次打开 Web 界面会要求设置第一个用户（管理员），登录后如果没有实例会要求填写实例名并在后台创建。
 
 ### 5. 模块开发
 
@@ -263,12 +263,13 @@ docker compose up --build
 
 ## 注意事项
 
-1. **版本兼容性**：Ghidra 11.3.2 是当前唯一兼容版本，其他版本可能导致 API 不兼容
+1. **版本兼容性**：Ghidra 12.1 是当前唯一兼容版本，其他版本可能导致 API 不兼容
 2. **Java 版本**：必须使用 JDK 21，设置 `JAVA_HOME` 环境变量
 3. **子模块**：首次克隆后必须执行 `git submodule update --init --recursive`
-4. **数据库认证**：当前默认凭据为 `akiba/akiba`
-5. **API 作用域**：流水线 API 只能被该流水线的后续任务调用
-6. **协程安全**：避免在协程中使用 Java `ReentrantLock`，改用 `Mutex`
+4. **数据库认证**：数据库守护进程用自身的凭据库（`~/.akiba/users.json`，bcrypt）校验用户名与口令；凭据库为空时第一次登录会自行注册为管理员，此后必须匹配。**不存在任何内置默认凭据**
+5. **登录防爆破**：Web 登录与守护程序登录使用同一套策略——失败（口令错误或用户名不存在）先等待 3 秒再返回，24 小时内连续失败 5 次即锁定该账户 24 小时；管理员可在 Users 页面点 Unlock 提前解锁，或调用 `POST /instance/unlock`。守护程序对来自 loopback 的调用豁免该策略（同机的框架服务器转发的是用户已输入的凭据，否则任何人 5 次错误口令就能让部署连不上自己的守护程序）
+6. **API 作用域**：流水线 API 只能被该流水线的后续任务调用
+7. **协程安全**：避免在协程中使用 Java `ReentrantLock`，改用 `Mutex`
 
 ## 拓展说明
 
