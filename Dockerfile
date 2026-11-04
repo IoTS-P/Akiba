@@ -1,5 +1,49 @@
+# syntax=docker/dockerfile:1
 # docker build -t akiba_allinone:4.3.1 .
+#
 
+# ---------------------------------------------------------------------------
+# Module jars are compiled from source in a throwaway stage.  They used to be
+# checked in under dockerfile_needed/ and silently went stale whenever the
+# framework's packages moved — the image then shipped jars referencing
+# `org.iotsplab.akiba.llm.agent.AgentModule`, and every manual chat turn died
+# with ClassNotFoundException.
+# ---------------------------------------------------------------------------
+FROM ubuntu:24.04 AS modules
+
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends openjdk-21-jdk-headless ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY gradle gradle
+COPY gradlew gradlew
+COPY settings.gradle.kts build.gradle.kts gradle.properties ./
+COPY subprojects/akiba_framework subprojects/akiba_framework
+COPY subprojects/akiba_db_daemon subprojects/akiba_db_daemon
+COPY subprojects/akiba_mod_utils subprojects/akiba_mod_utils
+COPY subprojects/akiba_mod_example subprojects/akiba_mod_example
+COPY subprojects/akiba_modules subprojects/akiba_modules
+
+RUN chmod +x gradlew && \
+    ./gradlew --no-daemon --console=plain :akiba_mod_utils:moduleJar-AkibaUtils
+
+# The example modules reference each other's jars by file path, so Gradle needs
+# those files to exist while it configures the tasks. Seed empty placeholders,
+# then build them in dependency order: every real jar replaces its placeholder
+# and becomes the classpath entry the next module needs.
+RUN mkdir -p subprojects/akiba_mod_example/build/libs && \
+    for n in 1 2 3 4 5; do : > subprojects/akiba_mod_example/build/libs/amod-AkibaExample$n-1.0.jar; done && \
+    for n in 1 2 3 4 5; do \
+        ./gradlew --no-daemon --console=plain :akiba_mod_example:moduleJar-AkibaExample$n || exit 1; \
+    done && \
+    test -s subprojects/akiba_mod_example/build/libs/amod-AkibaExample5-1.0.jar && \
+    test -s subprojects/akiba_mod_utils/build/libs/amod-AkibaUtils-1.2.jar
+
+# ---------------------------------------------------------------------------
+# Runtime image
+# ---------------------------------------------------------------------------
 FROM ubuntu:24.04
 ARG VERSION=4.3.1
 
@@ -51,7 +95,7 @@ RUN unzip akiba_db_daemon-${VERSION}.zip && \
 
 WORKDIR /home/akiba
 COPY --chown=akiba:akiba subprojects/akiba_framework/build/distributions/akiba-${VERSION}.zip .
-#RUN wget https://github.com//Akiba/releases/download/${VERSION}/akiba_framework-${VERSION}.zip
+#RUN wget https://github.com//Akiba/releases/download/${VERSION}/akiba-${VERSION}.zip
 RUN unzip akiba-${VERSION}.zip && \
     rm akiba-${VERSION}.zip && \
     mv akiba-${VERSION} akiba_framework && \
@@ -63,8 +107,11 @@ RUN chmod +x /home/akiba/binaries/entrypoint.sh && \
     chmod +x /home/akiba/binaries/test_run.sh && \
     chmod +x /home/akiba/binaries/auto_update.sh && \
     mkdir -p /home/akiba/akiba_framework/modules && \
-    cp /home/akiba/binaries/amod*.jar /home/akiba/akiba_framework/modules/ && \
     mkdir -p /home/akiba/.akiba && \
     echo "${VERSION}" > /home/akiba/.akiba/current_version
+
+# Module jars built by the `modules` stage above (never from the source tree).
+COPY --chown=akiba:akiba --from=modules /build/subprojects/akiba_mod_utils/build/libs/amod-*.jar /home/akiba/akiba_framework/modules/
+COPY --chown=akiba:akiba --from=modules /build/subprojects/akiba_mod_example/build/libs/amod-*.jar /home/akiba/akiba_framework/modules/
 
 WORKDIR /home/akiba/akiba_db_daemon

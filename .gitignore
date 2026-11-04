@@ -55,3 +55,5 @@ lib
 !/subprojects/akiba_mod_utils/
 !/subprojects/akiba_mod_example/
 !/subprojects/akiba_frontend/
+# Module jars are build outputs: the image compiles them from source.
+dockerfile_needed/amod-*.jar

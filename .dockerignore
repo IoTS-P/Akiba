@@ -1,0 +1,18 @@
+# Keep the build context small. Everything the Dockerfile actually needs is
+# preserved: the dist zips under */build/distributions and lib/ghidra.jar.
+**/.git
+**/.gradle
+**/.kotlin
+**/.idea
+**/build/classes
+**/build/tmp
+**/build/kotlin
+**/build/libs
+**/build/resources
+**/build/reports
+**/build/test-results
+**/build/docs
+subprojects/akiba_frontend/node_modules
+subprojects/akiba_frontend/dist
+# Module jars are built inside the image; a stale copy here must not leak in.
+dockerfile_needed/amod-*.jar
