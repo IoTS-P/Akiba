@@ -49,3 +49,30 @@
   （≈8.7 s/文件），旧路径在导入时做 Ghidra 全量分析。
 - 每个实例曾是独立 PostgreSQL 集群（`/akiba/instances/<name>`，端口 31800 起），
   这是"实例数据在 5432 里查不到"的原因。
+
+## 架构识别模块（AkibaArch）
+
+| 提交 | 内容 |
+|---|---|
+| `akiba_modules` 454e1fe | `AkibaArch` 模块 + `HeaderDetector`（ELF `e_machine` / PE `Machine` / Mach-O `cputype`）+ 单元测试 |
+| `akiba_framework` 7d1d069 | `identify_architecture` 工具；无架构时 `ensureProgramForBinary` 明确报错 |
+
+语言 ID 取自 `ProgramManager.GUESSED_PRIMARY_LEVEL_ARCHES`，保证导入侧一定能打开；
+头字段无法映射时**不猜**，保留 null 并报失败。
+
+已验证（容器内、真实 classpath）：
+
+```
+elf64_x86.bin      -> x86:LE:64:default | ELF | bits=64
+elf32_mips_be.bin  -> MIPS:BE:32:R6     | ELF | bits=32
+pe64.bin           -> x86:LE:64:default | PE  | bits=64
+macho_arm64.bin    -> AARCH64:LE:64:v8A | Mach-O | bits=64
+junk.bin           -> null
+binaries#3 写入     -> arch/format 落库（探针测试后已删除）
+```
+
+**尚未跑通**：模块整体经由框架执行（`identify_architecture` → `callModule`）。
+解析与写库两段已分别证明，组合段需要在有 LLM 的会话里或补一个 CLI 子命令后验证。
+
+已知阻塞：`akiba_modules` 的 `moduleJar-ALL` / `test` 因既有编译错误（`P2IMGateway` 的
+`definedStrings`，与本次改动无关）无法整体构建；单模块 `moduleJar-AkibaArch` 正常。
