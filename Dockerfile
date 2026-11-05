@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# docker build -t akiba_allinone:4.3.1 .
+# docker build -t akiba_allinone:4.4.0 .
 #
 
 # ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ RUN mkdir -p subprojects/akiba_mod_example/build/libs && \
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM ubuntu:24.04
-ARG VERSION=4.3.1
+ARG VERSION=4.4.0
 
 RUN apt-get update --fix-missing && \
     apt-get install -y wget gnupg ca-certificates lsb-release
