@@ -57,3 +57,7 @@ lib
 !/subprojects/akiba_frontend/
 # Module jars are build outputs: the image compiles them from source.
 dockerfile_needed/amod-*.jar
+
+# Local hand-off notes, never committed
+TODO.local.md
+*.local.md
