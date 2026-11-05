@@ -1,6 +1,14 @@
 # syntax=docker/dockerfile:1
 # docker build -t akiba_allinone:4.4.0 .
 #
+# On a slow route to the default mirrors, point the build at a closer one:
+#   docker build -t akiba_allinone:4.4.0 \
+#     --build-arg APT_MIRROR=http://mirrors.tuna.tsinghua.edu.cn \
+#     --build-arg NPM_REGISTRY=https://registry.npmmirror.com \
+#     --build-arg GRADLE_DIST_URL=https://mirrors.cloud.tencent.com/gradle/gradle-8.8-bin.zip \
+#     --build-arg MAVEN_MIRROR=https://maven.aliyun.com/repository/public \
+#     --build-arg PG_MIRROR=https://mirrors.aliyun.com/postgresql/repos/apt .
+#
 
 # ---------------------------------------------------------------------------
 # Module jars are compiled from source in a throwaway stage.  They used to be
@@ -12,8 +20,16 @@
 FROM ubuntu:24.04 AS modules
 
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update --fix-missing && \
-    apt-get install -y --no-install-recommends openjdk-21-jdk-headless ca-certificates && \
+# Optional: a closer Ubuntu mirror for slow routes to archive.ubuntu.com.
+ARG APT_MIRROR=
+RUN if [ -n "$APT_MIRROR" ]; then \
+        for f in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do \
+            [ -f "$f" ] && sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}/ubuntu|g" "$f"; \
+        done; \
+    fi
+
+RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 update --fix-missing && \
+    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y --no-install-recommends openjdk-21-jdk-headless ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -25,6 +41,21 @@ COPY subprojects/akiba_db_daemon subprojects/akiba_db_daemon
 COPY subprojects/akiba_mod_utils subprojects/akiba_mod_utils
 COPY subprojects/akiba_mod_example subprojects/akiba_mod_example
 COPY subprojects/akiba_modules subprojects/akiba_modules
+
+# Optional: fetch Gradle itself and Maven artifacts from closer mirrors. Both
+# default to the upstream services so a plain `docker build` is unchanged.
+ARG GRADLE_DIST_URL=
+RUN if [ -n "$GRADLE_DIST_URL" ]; then \
+        sed -i "s|distributionUrl=.*|distributionUrl=${GRADLE_DIST_URL}|" \
+            gradle/wrapper/gradle-wrapper.properties; \
+    fi
+
+ARG MAVEN_MIRROR=
+RUN if [ -n "$MAVEN_MIRROR" ]; then \
+        mkdir -p /root/.gradle/init.d && \
+        printf 'allprojects {\n    afterEvaluate {\n        repositories.clear()\n        repositories {\n            maven { url = uri("%s") }\n            mavenCentral()\n        }\n    }\n}\n' "$MAVEN_MIRROR" \
+            > /root/.gradle/init.d/mirror.gradle; \
+    fi
 
 RUN chmod +x gradlew && \
     ./gradlew --no-daemon --console=plain :akiba_mod_utils:moduleJar-AkibaUtils
@@ -50,15 +81,25 @@ RUN mkdir -p subprojects/akiba_mod_example/build/libs && \
 # ---------------------------------------------------------------------------
 FROM ubuntu:24.04
 ARG VERSION=4.4.0
+# Optional: a closer Ubuntu mirror for slow routes to archive.ubuntu.com.
+ARG APT_MIRROR=
+RUN if [ -n "$APT_MIRROR" ]; then \
+        for f in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do \
+            [ -f "$f" ] && sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}/ubuntu|g" "$f"; \
+        done; \
+    fi
 
-RUN apt-get update --fix-missing && \
-    apt-get install -y wget gnupg ca-certificates lsb-release
 
+RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 update --fix-missing && \
+    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y wget gnupg ca-certificates lsb-release
+
+# Optional: a closer PostgreSQL repository (aliyun and tencent both carry it).
+ARG PG_MIRROR=
 RUN wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O /usr/share/keyrings/postgresql-key.asc && \
-    echo "deb [signed-by=/usr/share/keyrings/postgresql-key.asc] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
-    apt-get update
+    echo "deb [signed-by=/usr/share/keyrings/postgresql-key.asc] ${PG_MIRROR:-http://apt.postgresql.org/pub/repos/apt} $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 update
 
-RUN apt-get install -y openjdk-21-jdk wget sudo zip unzip curl nginx pgbackrest postgresql-16 python3-bcrypt vim
+RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y openjdk-21-jdk wget sudo zip unzip curl nginx pgbackrest postgresql-16 python3-bcrypt vim
 
 RUN curl -fsSL https://nodejs.org/dist/v20.12.2/node-v20.12.2-linux-x64.tar.gz | tar -xz -C /opt && \
     ln -sf /opt/node-v20.12.2-linux-x64 /opt/nodejs && \
@@ -80,7 +121,10 @@ WORKDIR /home/akiba
 
 COPY --chown=akiba:akiba subprojects/akiba_frontend /home/akiba/akiba_frontend
 
-RUN cd /home/akiba/akiba_frontend && npm install && npm run build && rm -rf node_modules
+# Optional: a closer npm registry, same reason as APT_MIRROR.
+ARG NPM_REGISTRY=
+RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi && \
+    cd /home/akiba/akiba_frontend && npm install && npm run build && rm -rf node_modules
 
 COPY --chown=akiba:akiba dockerfile_needed/nginx.conf /etc/nginx/sites-available/akiba_frontend
 RUN sudo ln -sf /etc/nginx/sites-available/akiba_frontend /etc/nginx/sites-enabled/ && \
