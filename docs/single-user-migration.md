@@ -25,23 +25,32 @@
 - 建实例 `flat` → 默认集群出现 `inst_flat`
 - 导入 20 个文件 → `inst_flat.binaries` 20 行，`arch` 全为 NULL
 
+## 后续三步（已完成）
+
+| 提交 | 内容 |
+|---|---|
+| `akiba_framework` 4e8b184 | `identify-arch` CLI 子命令 |
+| `akiba_db_daemon` 0c8d2cb | 备份改为 `pg_dump` / `pg_restore` 逻辑备份 |
+| `akiba_framework` f1debf8、`akiba_frontend` 7546863 | 去掉目录里的用户层 |
+
+验证：
+- `identify-arch --all` 对 20 个导入文件全部识别成功，DB 20/20 有 arch
+- 备份 `inst_flat` 得到 9.3 KB dump + manifest；删除 5 行后按别名 `first` 恢复，20 行连带 arch 全部回来
+- 新导入落到 `~/.akiba/binaries/<instance>/original/`（无用户名层）
+
 ## 待办
 
-### 1. 备份需要重写（功能暂时关闭）
+### 1. 模块编译流程（用户已确认要修）
 
-`pgbackrest` 的 stanza 以"每实例一个数据目录"为前提，实例变成数据库后不再成立。
-现在 `BackupManager.backup()` / `restoreBackup()` 会明确报错而不是写错范围。
-重写方向：按实例数据库做逻辑备份（`pg_dump` / `pg_restore`），备份树
-（`backupDbName` / `backupTreeDbName`）保持。
+`akiba_modules` 的 `moduleJar-ALL` / `test` 会因为某个模块的编译错误整体失败
+（当前是 `P2IMGateway.kt:71` 的 `definedStrings`）。模块间存在依赖，但不应该
+"一个模块编译失败拖垮其他模块"。修法方向：模块任务彼此隔离、依赖按拓扑排序、
+失败只影响依赖它的模块。
 
-### 2. 配置与目录的残留
+### 2. `akiba_users` 库仍然存在
 
-- `server/db/ServerDatabase` 仍单独持有 `akiba_users` 库（JWT 会话所在），
-  它已经和实例同一个 5432 集群，只需确认部署时不再单独创建。
-- `RouteHelpers.currentUserGhidraProjectsRoot()` 这类按用户名分支的路径，
-  以及 `Settings.vue` 里 `~/.akiba/<area>/<username>` 的展示，都还带一层用户名；
-  单用户下可以拍平成 `~/.akiba/<area>`。
-- `dockerfile_needed/entrypoint.sh` 仍在创建 `akiba_users` 库与角色，可随上一并清理。
+`server/db/ServerDatabase` 用它存放单行凭据与 JWT 会话，entrypoint 也仍会创建它。
+它不再是"用户管理"，只是认证存储；如需更彻底，可改名为 `akiba_meta` 并并入实例集群的初始化。
 
 ## 背景数据（实测）
 
