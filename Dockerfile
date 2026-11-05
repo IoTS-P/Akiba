@@ -29,6 +29,10 @@ COPY subprojects/akiba_modules subprojects/akiba_modules
 RUN chmod +x gradlew && \
     ./gradlew --no-daemon --console=plain :akiba_mod_utils:moduleJar-AkibaUtils
 
+# The arch identifier is part of the normal import flow now, so it ships with the
+# image instead of being something the operator has to build.
+RUN ./gradlew --no-daemon --console=plain :akiba_modules:moduleJar-AkibaArch
+
 # The example modules reference each other's jars by file path, so Gradle needs
 # those files to exist while it configures the tasks. Seed empty placeholders,
 # then build them in dependency order: every real jar replaces its placeholder
@@ -113,5 +117,6 @@ RUN chmod +x /home/akiba/binaries/entrypoint.sh && \
 # Module jars built by the `modules` stage above (never from the source tree).
 COPY --chown=akiba:akiba --from=modules /build/subprojects/akiba_mod_utils/build/libs/amod-*.jar /home/akiba/akiba_framework/modules/
 COPY --chown=akiba:akiba --from=modules /build/subprojects/akiba_mod_example/build/libs/amod-*.jar /home/akiba/akiba_framework/modules/
+COPY --chown=akiba:akiba --from=modules /build/subprojects/akiba_modules/build/libs/amod-AkibaArch-*.jar /home/akiba/akiba_framework/modules/
 
 WORKDIR /home/akiba/akiba_db_daemon
