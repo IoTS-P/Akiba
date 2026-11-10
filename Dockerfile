@@ -5,7 +5,7 @@
 #   docker build -t akiba_allinone:4.4.0 \
 #     --build-arg APT_MIRROR=http://mirrors.tuna.tsinghua.edu.cn \
 #     --build-arg NPM_REGISTRY=https://registry.npmmirror.com \
-#     --build-arg GRADLE_DIST_URL=https://mirrors.cloud.tencent.com/gradle/gradle-8.8-bin.zip \
+#     --build-arg GRADLE_DIST_URL=https://mirrors.cloud.tencent.com/gradle/gradle-9.9.0-bin.zip \
 #     --build-arg MAVEN_MIRROR=https://maven.aliyun.com/repository/public \
 #     --build-arg PG_MIRROR=https://mirrors.aliyun.com/postgresql/repos/apt .
 #
@@ -30,15 +30,10 @@ RUN if [ -n "$APT_MIRROR" ]; then \
 
 # Ghidra 12.2 needs Java 25 (application.java.min=25). Ubuntu 26.04 ships it, so
 # the toolchain comes from the distribution instead of a side download.
-#
-# Gradle 8.8 itself must run on 21: it predates Java 25 and dies at startup with
-# "What went wrong: 25.0.5" (reproduced on the host, not distro-specific). Kotlin
-# still compiles against the 25 toolchain installed beside it, so the image
-# builds the same way a developer machine does.
 RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 update --fix-missing && \
-    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y --no-install-recommends openjdk-21-jdk-headless openjdk-25-jdk-headless ca-certificates && \
+    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y --no-install-recommends openjdk-25-jdk-headless ca-certificates && \
     rm -rf /var/lib/apt/lists/*
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
 
 WORKDIR /build
 COPY gradle gradle
