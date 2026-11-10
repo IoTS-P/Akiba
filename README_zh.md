@@ -32,7 +32,7 @@ git submodule update --init --recursive
 
 Kotlin 版本：2.3.20 及以上
 
-Ghidra.jar 版本: 12.1 (因 Ghidra API 不断更新，其他版本可能会存在兼容性问题)
+Ghidra.jar 版本: 12.1.4 (因 Ghidra API 不断更新，其他版本可能会存在兼容性问题)
 
 ## Docker 容器部署
 

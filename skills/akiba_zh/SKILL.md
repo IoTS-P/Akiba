@@ -49,9 +49,9 @@ cat skills/akiba_zh/akiba_config.json
 | `daemon.host` / `daemon.port` | 数据库守护进程地址                                                       |
 
 注意：
-- 若`akiba.home`为空或无效，且**需要自行开发模块**，需要从 Github 仓库 https://github.com/IoTS-P/Akiba.git 拉取，并按照仓库中的 README.md 拉取子模块，另外需要从 Github 下载 12.1 版本的 Ghidra：
-  1. 从 https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.1_build 下载 Ghidra 12.1 发布包
-  2. 解压发布包进入 `ghidra_12.1_PUBLIC/support`，在 Linux 系统中运行 `./buildGhidraJar` 脚本（如果没有权限则首先赋予），在 Windows 系统下运行 `buildGhidraJar.bat` 脚本。运行后将在 `ghidra_12.1_PUBLIC/support` 中生成 `ghidra.jar`。
+- 若`akiba.home`为空或无效，且**需要自行开发模块**，需要从 Github 仓库 https://github.com/IoTS-P/Akiba.git 拉取，并按照仓库中的 README.md 拉取子模块，另外需要从 Github 下载 12.1.4 版本的 Ghidra：
+  1. 从 https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.1.4_build 下载 Ghidra 12.1.4 发布包
+  2. 解压发布包进入 `ghidra_12.1.4_PUBLIC/support`，在 Linux 系统中运行 `./buildGhidraJar` 脚本（如果没有权限则首先赋予），在 Windows 系统下运行 `buildGhidraJar.bat` 脚本。运行后将在 `ghidra_12.1.4_PUBLIC/support` 中生成 `ghidra.jar`。
   3. 将 `ghidra.jar` 复制到 Akiba 源码仓库根目录内库目录（`akiba.home`内的`lib`）
 - 要运行 Akiba 框架，需要首先 cd 到发布程序根目录（`akiba.executableRoot`）后使用 `./bin/akiba_framework` 启动，不得在其他位置运行
 
@@ -70,7 +70,7 @@ curl -s "http://127.0.0.1:31777/test"
 |-------|---------|------|
 | Java | 21+ | 必须使用 JDK 21，低版本会导致运行时错误 |
 | Kotlin | 2.1.20+ | 框架开发语言 |
-| Ghidra | 12.1 | 二进制分析引擎（其他版本 API 不兼容） |
+| Ghidra | 12.1.4 | 二进制分析引擎（其他版本 API 不兼容） |
 | PostgreSQL | 最新稳定版 | 数据存储，由数据库守护进程管理 |
 
 #### 初始化步骤
@@ -263,7 +263,7 @@ docker compose up --build
 
 ## 注意事项
 
-1. **版本兼容性**：Ghidra 12.1 是当前唯一兼容版本，其他版本可能导致 API 不兼容
+1. **版本兼容性**：Ghidra 12.1.4 是当前唯一兼容版本，其他版本可能导致 API 不兼容
 2. **Java 版本**：必须使用 JDK 21，设置 `JAVA_HOME` 环境变量
 3. **子模块**：首次克隆后必须执行 `git submodule update --init --recursive`
 4. **数据库认证**：数据库守护进程用自身的凭据库（`~/.akiba/users.json`，bcrypt）校验用户名与口令；凭据库为空时第一次登录会自行注册为管理员，此后必须匹配。**不存在任何内置默认凭据**
