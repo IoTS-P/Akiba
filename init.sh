@@ -31,6 +31,19 @@ curl -fL "$DOWNLOAD_URL" -o "$TMP_ZIP"
 echo "Extracting to /tmp..."
 unzip -q "$TMP_ZIP" -d /tmp
 
+# buildGhidraJar refuses to run without a JDK and cannot prompt for one when
+# there is no TTY, so resolve it here instead of failing halfway through setup.
+if [ -z "${JAVA_HOME:-}" ]; then
+    if command -v java >/dev/null 2>&1; then
+        JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+        export JAVA_HOME
+        export PATH="$JAVA_HOME/bin:$PATH"
+    else
+        echo "ERROR: JAVA_HOME is unset and no java on PATH; install a JDK >= 17" >&2
+        exit 1
+    fi
+fi
+
 echo "Building ghidra.jar..."
 cd subprojects/akiba_framework/lib
 "$TMP_EXTRACT/support/buildGhidraJar"
