@@ -83,7 +83,7 @@ RUN mkdir -p subprojects/akiba_mod_example/build/libs && \
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM ubuntu:26.04
-ARG VERSION=4.4.0
+ARG VERSION=4.4.1
 # Optional: a closer Ubuntu mirror for slow routes to archive.ubuntu.com.
 ARG APT_MIRROR=
 RUN if [ -n "$APT_MIRROR" ]; then \
