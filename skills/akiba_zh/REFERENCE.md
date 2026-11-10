@@ -459,5 +459,5 @@ ls log/
 | 任务超时           | 增加 `timeout` 值或添加 `@IgnoreRuntimeTimeout` |
 | 数据库认证失败        | 确认用户名/口令与 `~/.akiba/users.json` 中的凭据一致（Akiba 不提供默认账号）；连续 5 次失败会锁定该账户 24 小时，管理员可在 Users 页面解锁 |
 | 模块找不到          | 确认 JAR 文件在 `modules/` 目录且以 `amod` 开头      |
-| Ghidra 版本不兼容   | 使用 Ghidra 12.1.4 版本                       |
+| Ghidra 版本不兼容   | 使用 Ghidra 12.2 版本                       |
 | Akiba 框架运行时崩溃  | 使用断点续传参数恢复还未完成的任务                         |

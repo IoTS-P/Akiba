@@ -29,8 +29,19 @@ RUN if [ -n "$APT_MIRROR" ]; then \
     fi
 
 RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 update --fix-missing && \
-    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y --no-install-recommends openjdk-21-jdk-headless ca-certificates && \
+    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y --no-install-recommends ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
+
+# Ghidra 12.2 refuses to run below Java 25 (Ghidra/application.properties
+# carries application.java.min=25), and Ubuntu 24.04 ships no openjdk-25, so
+# the runtime comes from Adoptium. The mirror argument keeps the download off a
+# slow route without changing the default behaviour.
+ARG JDK_URL=https://mirrors.tuna.tsinghua.edu.cn/Adoptium/25/jdk/x64/linux/OpenJDK25U-jdk_x64_linux_hotspot_25.0.5_8.tar.gz
+RUN mkdir -p /opt/jdk && \
+    curl -fsSL "$JDK_URL" | tar -xz --strip-components=1 -C /opt/jdk && \
+    /opt/jdk/bin/java -version
+ENV JAVA_HOME=/opt/jdk
+ENV PATH=$JAVA_HOME/bin:$PATH
 
 WORKDIR /build
 COPY gradle gradle
@@ -99,7 +110,15 @@ RUN wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O /usr/share/key
     echo "deb [signed-by=/usr/share/keyrings/postgresql-key.asc] ${PG_MIRROR:-http://apt.postgresql.org/pub/repos/apt} $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 update
 
-RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y openjdk-21-jdk wget sudo zip unzip curl nginx pgbackrest postgresql-16 python3-bcrypt vim
+RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y wget sudo zip unzip curl nginx pgbackrest postgresql-16 python3-bcrypt vim
+
+# Same JDK 25 as the build stage: Ghidra 12.2 will not start on anything older.
+ARG JDK_URL=https://mirrors.tuna.tsinghua.edu.cn/Adoptium/25/jdk/x64/linux/OpenJDK25U-jdk_x64_linux_hotspot_25.0.5_8.tar.gz
+RUN mkdir -p /opt/jdk && \
+    curl -fsSL "$JDK_URL" | tar -xz --strip-components=1 -C /opt/jdk && \
+    /opt/jdk/bin/java -version
+ENV JAVA_HOME=/opt/jdk
+ENV PATH=$JAVA_HOME/bin:$PATH
 
 RUN curl -fsSL https://nodejs.org/dist/v20.12.2/node-v20.12.2-linux-x64.tar.gz | tar -xz -C /opt && \
     ln -sf /opt/node-v20.12.2-linux-x64 /opt/nodejs && \
