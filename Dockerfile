@@ -28,11 +28,17 @@ RUN if [ -n "$APT_MIRROR" ]; then \
         done; \
     fi
 
-# Ghidra 12.2 needs Java 25 (application.java.min=25). Ubuntu 26.04 ships it in
-# main, so the toolchain comes from the distribution instead of a side download.
+# Ghidra 12.2 needs Java 25 (application.java.min=25). Ubuntu 26.04 ships it, so
+# the toolchain comes from the distribution instead of a side download.
+#
+# Gradle 8.8 itself must run on 21: it predates Java 25 and dies at startup with
+# "What went wrong: 25.0.5" (reproduced on the host, not distro-specific). Kotlin
+# still compiles against the 25 toolchain installed beside it, so the image
+# builds the same way a developer machine does.
 RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 update --fix-missing && \
-    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y --no-install-recommends openjdk-25-jdk-headless ca-certificates && \
+    apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 install -y --no-install-recommends openjdk-21-jdk-headless openjdk-25-jdk-headless ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 
 WORKDIR /build
 COPY gradle gradle
@@ -109,6 +115,8 @@ RUN curl -fsSL https://nodejs.org/dist/v20.12.2/node-v20.12.2-linux-x64.tar.gz |
     ln -sf /opt/nodejs/bin/node /usr/local/bin/node && \
     ln -sf /opt/nodejs/bin/npm /usr/local/bin/npm && \
     ln -sf /opt/nodejs/bin/npx /usr/local/bin/npx
+
+ENV JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
 
 RUN apt-get clean
 
