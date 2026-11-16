@@ -34,6 +34,16 @@ ASSET_PATTERNS=(
     'amod-AkibaUtils-[0-9].*\.jar'
 )
 
+# A build the operator installed by hand is their decision: with either the environment
+# variable or the marker file set, neither mode touches the installation. Local builds are
+# how this project is developed and tested, and silently replacing them costs a restart to
+# notice and another to undo.
+DISABLE_FILE="$UPDATE_DIR/disabled"
+
+auto_update_disabled() {
+    [ "${AKIBA_AUTO_UPDATE:-1}" = "0" ] || [ -f "$DISABLE_FILE" ]
+}
+
 mkdir -p "$UPDATE_DIR" "$STAGING_DIR"
 
 # ---- Helpers ----
@@ -76,6 +86,10 @@ print('newer' if a < b else 'older' if a > b else 'equal')
 # ---- Core: check GitHub and download ----
 
 do_check() {
+    if auto_update_disabled; then
+        log "Auto-update disabled; not checking for releases"
+        return 0
+    fi
     local current_version
     current_version=$(get_current_version)
     local now
@@ -172,6 +186,10 @@ print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))
 # ---- Apply staged updates (called by entrypoint on startup) ----
 
 do_apply() {
+    if auto_update_disabled; then
+        log "Auto-update disabled; keeping the installed build"
+        return 0
+    fi
     if [ ! -d "$STAGING_DIR" ] || [ -z "$(ls -A "$STAGING_DIR" 2>/dev/null)" ]; then
         return 0  # nothing staged
     fi
@@ -265,8 +283,16 @@ case "${1:-}" in
     --apply)
         do_apply
         ;;
+    --disable)
+        mkdir -p "$UPDATE_DIR" && : > "$DISABLE_FILE"
+        log "Auto-update disabled ($DISABLE_FILE)"
+        ;;
+    --enable)
+        rm -f "$DISABLE_FILE"
+        log "Auto-update enabled"
+        ;;
     *)
-        echo "Usage: auto_update.sh [--daemon|--check|--apply]"
+        echo "Usage: auto_update.sh [--daemon|--check|--apply|--disable|--enable]"
         echo "  --daemon   Background periodic checker (every 3 days)"
         echo "  --check    One-shot check + download (manual trigger)"
         echo "  --apply    Apply staged updates (entrypoint startup)"
