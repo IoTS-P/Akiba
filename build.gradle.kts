@@ -16,5 +16,5 @@ subprojects {
 }
 
 allprojects {
-    version = "4.4.11"
+    version = "4.4.12"
 }
