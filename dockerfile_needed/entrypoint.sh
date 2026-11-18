@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# One resident worker process per project is the only supported topology since 4.4.5.
+export AKIBA_PROJECT_WORKERS=1
+
 INIT_FLAG="/home/akiba/.init"
 DAEMON_DIR="/home/akiba/akiba_db_daemon"
 FRAMEWORK_DIR="/home/akiba/akiba_framework"
@@ -83,6 +86,14 @@ cleanup() {
 trap cleanup EXIT
 
 # ========== PostgreSQL Setup ==========
+# A data volume starts empty on a fresh machine, so there may be no cluster to start.
+# Creating one here is what lets the image ship without a data directory baked in.
+if [ ! -f /var/lib/postgresql/16/main/PG_VERSION ]; then
+    echo ">>> Empty data directory: creating the PostgreSQL cluster"
+    sudo rmdir /var/lib/postgresql/16/main 2>/dev/null || true
+    sudo pg_createcluster 16 main --start >/dev/null 2>&1 || true
+fi
+
 echo ">>> Starting PostgreSQL..."
 sudo service postgresql start
 
