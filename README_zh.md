@@ -42,6 +42,13 @@ Ghidra.jar 版本: 12.2 (因 Ghidra API 不断更新，其他版本可能会存�
 docker compose up --build
 ```
 
+## 文档
+
+- [任务 DSL](subprojects/akiba_framework/docs/plan-dsl.md) —— 用 Kotlin 脚本或 JSON 计划运行模块
+- [模块开发](https://github.com/IoTS-P/Akiba-Mod-Example) —— 编写自己的模块，含可运行示例
+- [发布版本](https://github.com/IoTS-P/Akiba/releases) —— 可直接下载的构建
+- [内置模块](https://github.com/IoTS-P/Akiba-Modules) —— Akiba 自带的模块
+
 ## 子模块
 
 - Akiba Framework：Akiba 运行时框架
@@ -49,4 +56,4 @@ docker compose up --build
 - Akiba Mod - Utils：Akiba 实用模块（对 Ghidra 进行二次封装）
 - Akiba Mod - Example：Akiba 示例模块
 - Akiba Frontend：Akiba web 前端页面项目（alpha）
-- Akiba Modules：Akiba 模块（目前闭源）
+- Akiba Modules：Akiba 模块

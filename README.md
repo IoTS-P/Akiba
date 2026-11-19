@@ -44,6 +44,13 @@ Ghidra.jar Version: 12.2 (Due to continuous updates of Ghidra API, other version
 docker compose up --build
 ```
 
+## Documentation
+
+- [Plan DSL](subprojects/akiba_framework/docs/plan-dsl.md) — running modules from a Kotlin script or a JSON plan
+- [Module development](https://github.com/IoTS-P/Akiba-Mod-Example) — writing your own modules, with a working example
+- [Releases](https://github.com/IoTS-P/Akiba/releases) — downloadable builds
+- [Modules](https://github.com/IoTS-P/Akiba-Modules) — the modules Akiba ships with
+
 ## Submodules
 
 - Akiba Framework: Akiba runtime framework
@@ -51,5 +58,5 @@ docker compose up --build
 - Akiba Mod - Utils: Akiba utility module (re-encapsulation of Ghidra)
 - Akiba Mod - Example: Akiba example module
 - Akiba Frontend: Akiba web interface (sidebar shell, workspace editor)
-- Akiba Modules: Akiba modules (currently closed source)
+- Akiba Modules: Akiba modules
   
