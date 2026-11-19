@@ -13,6 +13,7 @@ Akiba is a Ghidra-based batch pipeline task supported binary analysis framework 
 - Fully customizable and detachable modules, with support for simple workflow control
 - Supports massive Maven third-party library imports, more flexible and powerful than Ghidra Script
 - Completed LLM agent base infrastructure development, now you can use LLM API to analyze your binaries
+- Ships a web interface: each screen lives in a sidebar, and every workspace (one per program, per conversation, per skill) can be browsed and edited in place
 
 🤗 Want to develop your own functional modules?
 
@@ -24,11 +25,11 @@ Akiba is still in early development stage, there may be some bugs and performanc
 
 ## Environment Requirements
 
-Java Version: 21 and above
+Java Version: 25 and above (Ghidra 12.2 and the build toolchain both target 25)
 
 ```shell
-sudo apt install openjdk-21-jdk
-export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+sudo apt install openjdk-25-jdk
+export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
 git submodule update --init --recursive
 ```
 
@@ -49,6 +50,6 @@ docker compose up --build
 - Akiba Database Daemon: Akiba database daemon process
 - Akiba Mod - Utils: Akiba utility module (re-encapsulation of Ghidra)
 - Akiba Mod - Example: Akiba example module
-- Akiba Frontend: Akiba webpage (alpha)
+- Akiba Frontend: Akiba web interface (sidebar shell, workspace editor)
 - Akiba Modules: Akiba modules (currently closed source)
   
