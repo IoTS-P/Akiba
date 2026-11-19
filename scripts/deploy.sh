@@ -34,7 +34,7 @@ echo "==> installing $(basename "$framework_jar")"
 docker cp "$framework_jar" "$container:/home/akiba/akiba_framework/lib/$(basename "$framework_jar")"
 # Older builds of the same artifact would be loaded beside it.
 docker exec "$container" sh -c "ls /home/akiba/akiba_framework/lib/akiba_framework-*.jar" \
-  | grep -v "$(basename "$framework_jar")" \
+  | { grep -v "$(basename "$framework_jar")" || true; } \
   | while read -r stale; do
       echo "    removing stale $(basename "$stale")"
       docker exec "$container" rm -f "$stale"
