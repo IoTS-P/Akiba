@@ -61,3 +61,6 @@ dockerfile_needed/amod-*.jar
 # Local hand-off notes, never committed
 TODO.local.md
 *.local.md
+
+# internal notes: migration and rollout plans are not published
+docs/single-user-migration.md
