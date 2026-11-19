@@ -49,7 +49,8 @@ docker compose up --build
 - [Plan DSL](https://github.com/IoTS-P/Akiba-Framework/blob/master/docs/plan-dsl.md) — running modules from a Kotlin script or a JSON plan
 - [Module development](https://github.com/IoTS-P/Akiba-Mod-Example) — writing your own modules, with a working example
 - [Documentation rules](docs/documentation-rules.md) — how these documents are written and what stays out of the repository
-- [Modules](https://github.com/IoTS-P/Akiba-Modules) — the modules Akiba ships with
+- [Built-in modules](https://github.com/IoTS-P/Akiba-Mod-Utils) — the modules Akiba ships with, and where the bundled script library lives
+- [External modules](https://github.com/IoTS-P/Akiba-Modules) — modules written outside the built-in set
 
 ## Submodules
 
