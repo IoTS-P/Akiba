@@ -46,6 +46,7 @@ docker compose up --build
 
 - [任务 DSL](https://github.com/IoTS-P/Akiba-Framework/blob/master/docs/plan-dsl.md) —— 用 Kotlin 脚本或 JSON 计划运行模块
 - [模块开发](https://github.com/IoTS-P/Akiba-Mod-Example) —— 编写自己的模块，含可运行示例
+- [文档规矩](docs/documentation-rules.md) —— 这些文档怎么写，以及哪些内容不进仓库
 - [内置模块](https://github.com/IoTS-P/Akiba-Modules) —— Akiba 自带的模块
 
 ## 子模块
