@@ -20,13 +20,16 @@ skip_frontend=0
 cd "$root"
 
 echo "==> building"
-./gradlew :akiba_framework:jar :akiba_mod_utils:moduleJar-AkibaUtils --console=plain -q
+./gradlew :akiba_framework:jar :akiba_mod_utils:moduleJar-AkibaUtils \
+  :akiba_db_daemon:jar --console=plain -q
 
 framework_jar="$(ls -t subprojects/akiba_framework/build/libs/akiba_framework-*.jar \
   | grep -v sources | head -1)"
 module_jar="subprojects/akiba_mod_utils/build/libs/amod-AkibaUtils-1.2.jar"
+daemon_jar="$(ls -t subprojects/akiba_db_daemon/build/libs/akiba_db_daemon-*.jar \
+  | grep -v sources | head -1)"
 
-for jar in "$framework_jar" "$module_jar"; do
+for jar in "$framework_jar" "$module_jar" "$daemon_jar"; do
   [ -f "$jar" ] || { echo "missing build output: $jar" >&2; exit 1; }
 done
 
@@ -43,6 +46,15 @@ docker exec "$container" sh -c "ls /home/akiba/akiba_framework/lib/akiba_framewo
 echo "==> installing $(basename "$module_jar")"
 docker cp "$module_jar" "$container:/home/akiba/akiba_framework/modules/$(basename "$module_jar")"
 
+echo "==> installing $(basename "$daemon_jar")"
+docker cp "$daemon_jar" "$container:/home/akiba/akiba_db_daemon/lib/$(basename "$daemon_jar")"
+docker exec "$container" sh -c "ls /home/akiba/akiba_db_daemon/lib/akiba_db_daemon-*.jar" \
+  | { grep -v "$(basename "$daemon_jar")" || true; } \
+  | while read -r stale; do
+      echo "    removing stale $(basename "$stale")"
+      docker exec "$container" rm -f "$stale"
+    done
+
 echo "==> verifying the module jar in the container"
 local_sum="$(sha256sum "$module_jar" | cut -d' ' -f1)"
 remote_sum="$(docker exec "$container" sha256sum \
@@ -54,6 +66,17 @@ if [ "$local_sum" != "$remote_sum" ]; then
   exit 1
 fi
 echo "    $local_sum"
+
+daemon_sum="$(sha256sum "$daemon_jar" | cut -d' ' -f1)"
+daemon_remote="$(docker exec "$container" sha256sum \
+  "/home/akiba/akiba_db_daemon/lib/$(basename "$daemon_jar")" | cut -d' ' -f1)"
+if [ "$daemon_sum" != "$daemon_remote" ]; then
+  echo "daemon jar in the container is not the one that was built:" >&2
+  echo "  built:     $daemon_sum" >&2
+  echo "  container: $daemon_remote" >&2
+  exit 1
+fi
+echo "    daemon $daemon_sum"
 
 if [ "$skip_frontend" -eq 0 ]; then
   echo "==> building the frontend"
